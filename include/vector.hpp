@@ -9,4 +9,4 @@
 #include "vector3.hpp"
 #include "vector4.hpp"
 
-#endif //CGMATH_VECTOR_HPP
+#endif  // CGMATH_VECTOR_HPP
