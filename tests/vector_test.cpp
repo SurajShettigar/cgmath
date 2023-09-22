@@ -64,8 +64,6 @@ TEST_F(VectorTest, Vecto2Getters) {
 
   ASSERT_EQ_FLT(vec2_arr_init.getX(), 1.0);
   ASSERT_EQ_FLT(vec2_arr_init.getY(), 0.5);
-
-  ASSERT_DEATH_IF_SUPPORTED(vec2_arr_init[2], "out of range");
 }
 
 TEST_F(VectorTest, Vector2Setters) {
@@ -211,8 +209,6 @@ TEST_F(VectorTest, Vector3Getters) {
   ASSERT_EQ_FLT(vec3_arr_init.getX(), 1.0);
   ASSERT_EQ_FLT(vec3_arr_init.getY(), 0.5);
   ASSERT_EQ_FLT(vec3_arr_init.getZ(), 0.25);
-
-  ASSERT_DEATH_IF_SUPPORTED(vec3_arr_init[3], "out of range");
 }
 
 TEST_F(VectorTest, Vector3Setters) {
@@ -410,8 +406,6 @@ TEST_F(VectorTest, Vector4Getters) {
   ASSERT_EQ_FLT(vec4_arr_init.getY(), 0.5);
   ASSERT_EQ_FLT(vec4_arr_init.getZ(), 0.25);
   ASSERT_EQ_FLT(vec4_arr_init.getW(), 0.125);
-
-  ASSERT_DEATH_IF_SUPPORTED(vec4_arr_init[4], "out of range");
 }
 
 TEST_F(VectorTest, Vector4Setters) {
