@@ -19,10 +19,8 @@ const Vector4 Vector4::BACK{0.0, 0.0, -1.0, 0.0};
 const Vector4 Vector4::DIRECTION{1.0, 1.0, 1.0, 0.0};
 const Vector4 Vector4::POSITION{1.0, 1.0, 1.0, 1.0};
 
-Vector4::operator Vector2() const {
-    return Vector2{m_value[0], m_value[1]};
-}
+Vector4::operator Vector2() const { return Vector2{m_value[0], m_value[1]}; }
 
 Vector4::operator Vector3() const {
-    return Vector3{m_value[0], m_value[1], m_value[2]};
+  return Vector3{m_value[0], m_value[1], m_value[2]};
 }

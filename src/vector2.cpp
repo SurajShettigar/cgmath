@@ -13,9 +13,9 @@ const Vector2 Vector2::UP{0.0, 1.0};
 const Vector2 Vector2::DOWN{0.0, -1.0};
 
 Vector2::operator Vector3() const {
-    return Vector3{m_value[0], m_value[1], 0.0};
+  return Vector3{m_value[0], m_value[1], 0.0};
 }
 
 Vector2::operator Vector4() const {
-    return Vector4{m_value[0], m_value[1], 0.0, 0.0};
+  return Vector4{m_value[0], m_value[1], 0.0, 0.0};
 }
