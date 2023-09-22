@@ -21,9 +21,9 @@ install(TARGETS cgmath LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 # Library configuration options
-option(INCLUDE_TESTS "Include test files and test dependencies?" OFF)
+option(INCLUDE_TESTS "Include test files and test dependencies?" ON)
 option(USE_SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
-option(DOUBLE_PRECISION "Uses double precision floating point values." OFF)
+option(DOUBLE_PRECISION "Uses double precision floating point values." ON)
 
 # Library dependencies
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${PROJECT_SOURCE_DIR}/ext)
