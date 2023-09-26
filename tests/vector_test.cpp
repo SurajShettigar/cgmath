@@ -46,7 +46,18 @@ class VectorTest : public ::testing::Test {
   }
 };
 
+#include <iostream>
 TEST_F(VectorTest, Vecto2Getters) {
+#if defined(__AVX512F__)
+  std::cout << "AVX512 SIMD Intrinsics supported" << std::endl;
+#elif defined(__AVX2__)
+  std::cout << "AVX2 SIMD Intrinsics supported" << std::endl;
+#elif defined(___AVX__)
+  std::cout << "AVX SIMD Intrinsics supported" << std::endl;
+#else
+  std::cout << "SSE SIMD Intrinsics supported" << std::endl;
+#endif
+
   ASSERT_EQ_FLT(vec2_def_init[0], 0.0);
   ASSERT_EQ_FLT(vec2_def_init[1], 0.0);
 

@@ -22,14 +22,20 @@ install(TARGETS cgmath LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 
 # Library configuration options
 option(INCLUDE_TESTS "Include test files and test dependencies?" ON)
-option(USE_SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
 option(DOUBLE_PRECISION "Uses double precision floating point values." ON)
+option(SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
+set(SIMD_ARCH "AVX2" CACHE STRING "Target Architecture used to compile SIMD intrinsics.")
+list(APPEND SIMD_ARCH_LIST "SSE2" "AVX" "AVX2" "AVX512")
+set_property(CACHE SIMD_ARCH PROPERTY STRINGS SIMD_ARCH_LIST)
 
-# Library dependencies
+# Cmake includes
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${PROJECT_SOURCE_DIR}/ext)
+# Library dependencies
 include(Packages)
+# Compiler setup
+include(CompilerSetup)
 
-if (USE_SIMD_INTRINSICS)
+if (SIMD_INTRINSICS)
     message("Math Library using SIMD intrinsics")
     target_compile_definitions(cgmath PUBLIC USE_INTRINSICS)
 endif ()
