@@ -3,7 +3,9 @@
 
 #include <gtest/gtest.h>
 
-#include <vector.hpp>
+#include <vector2.hpp>
+#include <vector3.hpp>
+#include <vector4.hpp>
 
 #ifdef USE_DOUBLE
 #define ASSERT_EQ_FLT(val1, val2) ASSERT_DOUBLE_EQ(val1, val2)

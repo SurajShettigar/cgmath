@@ -9,6 +9,7 @@
 #include <string>
 
 #include "constants.hpp"
+#include "internal/vector.hpp"
 
 namespace cgmath {
 class Vector2;

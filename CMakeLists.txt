@@ -11,9 +11,8 @@ add_library(cgmath STATIC
         src/vector2.cpp
         src/vector3.cpp
         src/vector4.cpp)
-set_target_properties(cgmath PROPERTIES VERSION ${PROJECT_VERSION}
-        PUBLIC_HEADER include/vector.hpp)
-target_include_directories(cgmath PUBLIC include)
+set_target_properties(cgmath PROPERTIES VERSION ${PROJECT_VERSION})
+target_include_directories(cgmath PUBLIC include PRIVATE internal)
 
 # Library install setup
 include(GNUInstallDirs)
@@ -25,7 +24,7 @@ option(INCLUDE_TESTS "Include test files and test dependencies?" ON)
 option(DOUBLE_PRECISION "Uses double precision floating point values." ON)
 option(SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
 set(SIMD_ARCH "AVX2" CACHE STRING "Target Architecture used to compile SIMD intrinsics.")
-list(APPEND SIMD_ARCH_LIST "SSE2" "AVX" "AVX2" "AVX512")
+list(APPEND SIMD_ARCH_LIST "SSE4_2" "AVX" "AVX2" "AVX512")
 set_property(CACHE SIMD_ARCH PROPERTY STRINGS SIMD_ARCH_LIST)
 
 # Cmake includes
