@@ -5,6 +5,7 @@
 #define CGMATH_INTERNAL_SIMD_HPP
 
 #ifdef USE_INTRINSICS
+#include <immintrin.h>
 namespace cgmath::internal {
 
 /**
@@ -24,19 +25,16 @@ enum class SIMDMicroArchitectureLevel {
 
 #if defined(__AVX512F__)
 // 64 byte vectorization
-#include <immintrin.h>
 static constexpr SIMDMicroArchitectureLevel SIMD_LEVEL =
     SIMDMicroArchitectureLevel::VERSION_4;
 #elif defined(__AVX2__) || defined(__AVX__)
 // 32 byte vectorization
-#include <immintrin.h>
 static constexpr SIMDMicroArchitectureLevel SIMD_LEVEL =
     SIMDMicroArchitectureLevel::VERSION_3;
 #else
 // 16 byte vectorization
-#include <emmintrin.h>
 static constexpr SIMDMicroArchitectureLevel SIMD_LEVEL =
-    SIMDMicroArchitectureLevel::BASE;
+    SIMDMicroArchitectureLevel::VERSION_2;
 #endif
 
 }  // namespace cgmath::internal

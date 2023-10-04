@@ -30,6 +30,24 @@ class Vector {
 #endif  // USE_INTRINSICS
         {};
 
+  /// Construct a 4D vector with each dimension set to the given value
+  explicit Vector(FLOAT value)
+      :
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+        m_value{_mm256_set1_pd(value)}
+#else
+        m_value{_mm_set1_pd(value), _mm_set1_pd(value)}
+#endif  // AVX INTRINSICS
+#else
+        m_value{_mm_set1_ps(value)}
+#endif  // USE_DOUBLE
+#else
+        m_value{value, value, value, value}
+#endif  // USE_INTRINSICS
+        {};
+
   /// Construct a 4D vector from 4 floating point values.
   explicit Vector(FLOAT x, FLOAT y, FLOAT z, FLOAT w)
       :
@@ -79,13 +97,40 @@ class Vector {
   }
 
   // Getters / Setters
-//  [[nodiscard]] inline FLOAT getX() const { return m_value[0]; }
-//
-//  [[nodiscard]] inline FLOAT getY() const { return m_value[1]; }
-//
-//  [[nodiscard]] inline FLOAT getZ() const { return m_value[2]; }
-//
-//  [[nodiscard]] inline FLOAT getW() const { return m_value[3]; }
+  inline void get(FLOAT *data) const {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    _mm256_store_pd(data, m_value);
+#else
+    _mm_store_pd(data, m_value[0]);
+    _mm_store_pd(data + (2 * sizeof(FLOAT)), m_value[1]);
+#endif  // AVX INTRINSICS
+#else
+    _mm_store_ps(data, m_value);
+#endif  // USE_DOUBLE
+#else
+    memcpy(data, m_value.data(), m_value.size());
+#endif  // USE_INTRINSICS
+  }
+
+  inline FLOAT operator[](size_t index) const {
+#ifdef USE_INTRINSICS
+    std::array<FLOAT, 4> val{};
+    get(val.data());
+    return val[index];
+#else
+    return m_value[index];
+#endif  // USE_INTRINSICS
+  }
+
+  [[nodiscard]] inline FLOAT getX() const { return (*this)[0]; }
+
+  [[nodiscard]] inline FLOAT getY() const { return (*this)[1]; }
+
+  [[nodiscard]] inline FLOAT getZ() const { return (*this)[2]; }
+
+  [[nodiscard]] inline FLOAT getW() const { return (*this)[3]; }
 
   inline void setX(FLOAT x) {
 #ifdef USE_INTRINSICS
@@ -126,9 +171,13 @@ class Vector {
 #endif  // AVX INTRINSICS
 #else
     __m128 setY = _mm_set_ss(y);
-    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 2, 0, 1));
-    m_value = _mm_move_sd(m_value, setY);
-    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 2, 0, 1));
+    /// SSE2 compatible method
+    //    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 2, 0, 1));
+    //    m_value = _mm_move_sd(m_value, setY);
+    //    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 2, 0, 1));
+
+    /// SSE4_1 compatible method
+    m_value = _mm_insert_ps(m_value, setY, 0x10);
 #endif  // USE_DOUBLE
 #else
     m_value[1] = y;
@@ -149,9 +198,14 @@ class Vector {
 #endif  // AVX INTRINSICS
 #else
     __m128 setZ = _mm_set_ss(z);
-    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 0, 1, 2));
-    m_value = _mm_move_sd(m_value, setZ);
-    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 0, 1, 2));
+
+    /// SSE2 compatible method
+    //    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 0, 1, 2));
+    //    m_value = _mm_move_sd(m_value, setZ);
+    //    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(3, 0, 1, 2));
+
+    /// SSE4_1 compatible method
+    m_value = _mm_insert_ps(m_value, setZ, 0x20);
 #endif  // USE_DOUBLE
 #else
     m_value[2] = z;
@@ -176,9 +230,14 @@ class Vector {
 #endif  // AVX INTRINSICS
 #else
     __m128 setW = _mm_set_ss(w);
-    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(0, 2, 1, 3));
-    m_value = _mm_move_sd(m_value, setW);
-    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(0, 2, 1, 3));
+
+    /// SSE2 compatible method
+    //    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(0, 2, 1, 3));
+    //    m_value = _mm_move_sd(m_value, setW);
+    //    m_value = _mm_shuffle_ps(m_value, m_value, _MM_SHUFFLE(0, 2, 1, 3));
+
+    /// SSE4_1 compatible method
+    m_value = _mm_insert_ps(m_value, setW, 0x30);
 #endif  // USE_DOUBLE
 #else
     m_value[3] = w;
@@ -205,31 +264,378 @@ class Vector {
 #endif  // USE_INTRINSICS
   }
 
-//  inline void set(const std::array<FLOAT, 4> &value) { m_value = value; }
-//
-//  FLOAT operator[](size_t index) const { return m_value[index]; }
-//
-//  FLOAT &operator[](size_t index) { return m_value[index]; }
+  inline void set(const std::array<FLOAT, 4> &value) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    m_value = _mm256_load_pd(value.data());
+#else
+    m_value[0] = _mm_set_pd(value[1], value[0]);
+    m_value[1] = _mm_set_pd(value[3], value[2]);
+#endif  // AVX INTRINSICS
+#else
+    m_value = _mm_load_ps(value.data());
+#endif  // USE_DOUBLE
+#else
+    m_value = value;
+#endif  // USE_INTRINSICS
+  }
 
   // Type-Conversions
   /// Convert to a human-readable string value.
-//  explicit inline operator std::string() const {
-//    return "[" + std::to_string(m_value[0]) + ", " +
-//           std::to_string(m_value[1]) + ", " + std::to_string(m_value[2]) +
-//           ", " + std::to_string(m_value[3]) + "]";
-//  }
+  explicit inline operator std::string() const {
+#ifdef USE_INTRINSICS
+    std::array<FLOAT, 4> val{};
+    get(val.data());
+    return "[" + std::to_string(val[0]) + ", " + std::to_string(val[1]) + ", " +
+           std::to_string(val[2]) + ", " + std::to_string(val[3]) + "]";
+#else
+    return "[" + std::to_string(m_value[0]) + ", " +
+           std::to_string(m_value[1]) + ", " + std::to_string(m_value[2]) +
+           ", " + std::to_string(m_value[3]) + "]";
+#endif  // USE_INTRINSICS
+  }
+
+  // Operators
+  inline friend Vector operator+(const Vector &lhs, const Vector &rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_add_pd(lhs.m_value, rhs.m_value));
+#else
+    return Vector({_mm_add_pd(lhs.m_value[0], rhs.m_value[0]),
+                   _mm_add_pd(lhs.m_value[1], rhs.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_add_ps(lhs.m_value, rhs.m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector{
+        lhs.m_value[0] + rhs.m_value[0], lhs.m_value[1] + rhs.m_value[1],
+        lhs.m_value[2] + rhs.m_value[2], lhs.m_value[3] + rhs.m_value[3]};
+#endif  // USE_INTRINSICS
+  }
+
+  inline friend Vector operator-(const Vector &lhs, const Vector &rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_sub_pd(lhs.m_value, rhs.m_value));
+#else
+    return Vector({_mm_sub_pd(lhs.m_value[0], rhs.m_value[0]),
+                   _mm_sub_pd(lhs.m_value[1], rhs.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_sub_ps(lhs.m_value, rhs.m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector{
+        lhs.m_value[0] - rhs.m_value[0], lhs.m_value[1] - rhs.m_value[1],
+        lhs.m_value[2] - rhs.m_value[2], lhs.m_value[3] - rhs.m_value[3]};
+#endif  // USE_INTRINSICS
+  }
+
+  inline friend Vector operator*(const Vector &lhs, FLOAT rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_mul_pd(lhs.m_value, Vector(rhs).m_value));
+#else
+    Vector right = Vector(rhs);
+    return Vector({_mm_mul_pd(lhs.m_value[0], right.m_value[0]),
+                   _mm_mul_pd(lhs.m_value[1], right.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_mul_ps(lhs.m_value, Vector(rhs).m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector{lhs.m_value[0] * rhs, lhs.m_value[1] * rhs,
+                  lhs.m_value[2] * rhs, lhs.m_value[3] * rhs};
+#endif  // USE_INTRINSICS
+  }
+
+  inline friend Vector operator*(FLOAT lhs, const Vector &rhs) {
+    return rhs * lhs;
+  }
+
+  inline friend Vector operator/(const Vector &lhs, FLOAT rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_div_pd(lhs.m_value, Vector(rhs).m_value));
+#else
+    Vector right = Vector(rhs);
+    return Vector({_mm_div_pd(lhs.m_value[0], right.m_value[0]),
+                   _mm_div_pd(lhs.m_value[1], right.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_div_ps(lhs.m_value, Vector(rhs).m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector{lhs.m_value[0] / rhs, lhs.m_value[1] / rhs,
+                  lhs.m_value[2] / rhs, lhs.m_value[3] / rhs};
+#endif  // USE_INTRINSICS
+  }
+
+  inline friend Vector operator/(FLOAT lhs, const Vector &rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_div_pd(Vector(lhs).m_value, rhs.m_value));
+#else
+    return Vector({_mm_div_pd(Vector(lhs).m_value[0], rhs.m_value[0]),
+                   _mm_div_pd(Vector(lhs).m_value[1], rhs.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_div_ps(Vector(lhs).m_value, rhs.m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector{lhs / rhs.m_value[0], lhs / rhs.m_value[1],
+                  lhs / rhs.m_value[2], lhs / rhs.m_value[3]};
+#endif  // USE_INTRINSICS
+  }
+
+  inline bool operator<(const Vector &rhs) const {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d cmp = _mm256_cmp_pd(m_value, rhs.m_value, 0x01);
+    return _mm256_movemask_pd(cmp) == 0b1111;
+#else
+    __m128d cmp1 = _mm_cmplt_pd(m_value[0], rhs.m_value[0]);
+    __m128d cmp2 = _mm_cmplt_pd(m_value[1], rhs.m_value[1]);
+    cmp2 = _mm_cmpeq_pd(cmp1, cmp2);
+    return _mm_movemask_pd(cmp2) == 0b11;
+#endif  // AVX INTRINSICS
+#else
+    __m128 cmp = _mm_cmplt_ps(m_value, rhs.m_value);
+    return _mm_movemask_ps(cmp) == 0b1111;
+#endif  // USE_DOUBLE
+#else
+    return m_value[0] < rhs.m_value[0] && m_value[1] < rhs.m_value[1] &&
+           m_value[2] < rhs.m_value[2] && m_value[3] < rhs.m_value[3];
+#endif  // USE_INTRINSICS
+  }
+
+  /// Checks if two floating point values are equal. Because of floating point
+  /// imprecision,
+  /// == operator cannot be used directly.
+  inline bool operator==(const Vector &rhs) const {
+    // Refer: https://realtimecollisiondetection.net/blog/?p=89
+    return Vector::abs(*this - rhs) <
+           EPSILON * Vector::max(Vector(1.0), Vector::max(Vector::abs(*this),
+                                                          Vector::abs(rhs)));
+  }
+
+  inline bool operator!=(const Vector &rhs) const { return !(*this == rhs); }
+
+  inline bool operator<=(const Vector &rhs) const {
+    return *this < rhs || *this == rhs;
+  }
+
+  inline bool operator>(const Vector &rhs) const { return rhs < *this; }
+
+  inline bool operator>=(const Vector &rhs) const { return rhs <= *this; }
+
+  inline Vector operator-() const {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_xor_pd(m_value, _mm256_set1_pd(-0.0)));
+#else
+    __m128d mask = _mm_set1_pd(-0.0);
+    return Vector({_mm_xor_pd(m_value[0], mask), _mm_xor_pd(m_value[1], mask)});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_xor_ps(m_value, _mm_set1_ps(-0.0f)));
+#endif  // USE_DOUBLE
+#else
+    return Vector(-m_value[0], -m_value[1], -m_value[2], -m_value[3]);
+#endif  // USE_INTRINSICS
+  }
+
+  inline Vector &operator+=(const Vector &rhs) {
+#ifdef USE_INTRINSICS
+    *this = *this + rhs;
+#else
+    m_value[0] += rhs.m_value[0];
+    m_value[1] += rhs.m_value[1];
+    m_value[2] += rhs.m_value[2];
+    m_value[3] += rhs.m_value[3];
+#endif  // USE_INTRINSICS
+    return *this;
+  }
+
+  Vector &operator-=(const Vector &rhs) {
+#ifdef USE_INTRINSICS
+    *this = *this - rhs;
+#else
+    m_value[0] -= rhs.m_value[0];
+    m_value[1] -= rhs.m_value[1];
+    m_value[2] -= rhs.m_value[2];
+    m_value[3] -= rhs.m_value[3];
+#endif  // USE_INTRINSICS
+    return *this;
+  }
+
+  Vector &operator*=(FLOAT rhs) {
+#ifdef USE_INTRINSICS
+    *this = *this * rhs;
+#else
+    m_value[0] *= rhs;
+    m_value[1] *= rhs;
+    m_value[2] *= rhs;
+    m_value[3] *= rhs;
+#endif  // USE_INTRINSICS
+    return *this;
+  }
+
+  Vector &operator/=(FLOAT rhs) { return *this *= 1.0 / rhs; }
+
+  friend std::ostream &operator<<(std::ostream &out, const Vector &vec) {
+    return out << static_cast<std::string>(vec);
+  }
+
+  // Vector specific operations
+  /// Get the absolute values of each vector dimension.
+  [[nodiscard]] inline Vector abs() const {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d mask = _mm256_castsi256_pd(
+        _mm256_set1_epi64x(static_cast<int64_t>(0x8000000000000000)));
+    return Vector(_mm256_andnot_pd(mask, m_value));
+#else
+    __m128d mask = _mm_castsi128_pd(
+        _mm_set1_epi64x(static_cast<int64_t>(0x8000000000000000)));
+    return Vector(
+        {_mm_andnot_pd(mask, m_value[0]), _mm_andnot_pd(mask, m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    __m128 mask =
+        _mm_castsi128_ps(_mm_set1_epi32(static_cast<int32_t>(0x80000000)));
+    return Vector(_mm_andnot_ps(mask, m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector(std::fabs(m_value[0]), std::fabs(m_value[1]),
+                  std::fabs(m_value[2]), std::fabs(m_value[3]));
+#endif  // USE_INTRINSICS
+  }
+
+  /// Get the squared length / magnitude of the 4D vector.
+  [[nodiscard]] inline FLOAT lengthSquared() const {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d len = _mm256_mul_pd(m_value, m_value);
+    len = _mm256_hadd_pd(len, len);
+    len = _mm256_hadd_pd(len, len);
+    return _mm256_cvtsd_f64(len);
+#else
+    __m128d a = _mm_mul_pd(m_value[0], m_value[0]);
+    __m128d b = _mm_mul_pd(m_value[1], m_value[1]);
+    b = _mm_hadd_pd(a, b);
+    b = _mm_hadd_pd(b, b);
+    return _mm_cvtsd_f64(b);
+#endif  // AVX INTRINSICS
+#else
+    __m128 len = _mm_dp_ps(m_value, m_value, 0xFF);
+    return _mm_cvtss_f32(len);
+#endif  // USE_DOUBLE
+#else
+    return m_value[0] * m_value[0] + m_value[1] * m_value[1] +
+           m_value[2] * m_value[2] + m_value[3] * m_value[3];
+#endif  // USE_INTRINSICS
+  }
+
+  /// Get the length / magnitude of the 4D vector.
+  [[nodiscard]] inline FLOAT length() const {
+    return std::sqrt(lengthSquared());
+  }
+
+  /// Normalize the given 4 vector. The 4D vector will have a length of 1.
+  [[nodiscard]] inline Vector normalized() const { return *this / length(); }
+
+  /// Get the absolute values of each vector dimension.
+  static inline Vector abs(const Vector &vec) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_andnot_pd(_mm256_set1_pd(-0.0), vec.m_value));
+#else
+    __m128d mask = _mm_set1_pd(-0.0);
+    return Vector({_mm_andnot_pd(mask, vec.m_value[0]),
+                   _mm_andnot_pd(mask, vec.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_andnot_ps(_mm_set1_ps(-0.0f), vec.m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector(std::fabs(vec.m_value[0]), std::fabs(vec.m_value[1]),
+                  std::fabs(vec.m_value[2]), std::fabs(vec.m_value[3]));
+#endif  // USE_INTRINSICS
+  }
+
+  /// Returns a vector with the maximum values among two given vectors.
+  static inline Vector max(const Vector &lhs, const Vector &rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Vector(_mm256_max_pd(lhs.m_value, rhs.m_value));
+#else
+    return Vector({_mm_max_pd(lhs.m_value[0], rhs.m_value[0]),
+                   _mm_max_pd(lhs.m_value[1], rhs.m_value[1])});
+#endif  // AVX INTRINSICS
+#else
+    return Vector(_mm_max_ps(lhs.m_value, rhs.m_value));
+#endif  // USE_DOUBLE
+#else
+    return Vector(std::max(lhs.m_value[0], rhs.m_value[0]),
+                  std::max(lhs.m_value[1], rhs.m_value[1]),
+                  std::max(lhs.m_value[2], rhs.m_value[2]),
+                  std::max(lhs.m_value[3], rhs.m_value[3]));
+#endif  // USE_INTRINSICS
+  }
+
+  /**
+   * Get the length of the given 4D vector.
+   * @param vec 4D vector whose length / magnitude needs to be found.
+   * @return The length / the magnitude.
+   */
+  static FLOAT length(const Vector &vec) { return vec.length(); }
+
+  /**
+   * Get a normalized vector from the given 4D vector.
+   * @param vec 4D vector to normalize.
+   * @return A normalized 4D vector whose length is 1.
+   */
+  static Vector normalize(const Vector &vec) { return vec.normalized(); }
+
+  /**
+   *  Linearly interpolates between two 4D vectors.
+   * @param from 4D vector to interpolate from.
+   * @param to 4D vector to interpolate to.
+   * @param t Scalar value within the  range [0, 1] to control interpolation.
+   * @return An interpolated 4D vector.
+   */
+  static Vector lerp(const Vector &from, const Vector &to, FLOAT t) {
+    return from * (1.0 - t) + to * t;
+  }
 
  private:
 #ifdef USE_INTRINSICS
 /**<---USE_INTRINSICS BEGIN--->**/
 #if USE_DOUBLE
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
-  __m256d m_value{};
+  __m256d m_value;
+  explicit Vector(__m256d value) : m_value{value} {};
 #else
-  std::array<__m128d, 2> m_value{};
+  std::array<__m128d, 2> m_value;
+  explicit Vector(const std::array<__m128d, 2> &value) : m_value{value} {};
 #endif
 #else
-  __m128 m_value{};
+  __m128 m_value;
+  explicit Vector(__m128 value) : m_value{value} {};
 #endif
 /**<---USE_INTRINSICS END--->**/
 #else

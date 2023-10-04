@@ -47,7 +47,7 @@ static constexpr FLOAT DEGREES_TO_RADIANS = 0.017453292519943;
 /// == operator cannot be used directly.
 inline bool approxEqual(FLOAT lhs, FLOAT rhs) {
   // Refer: https://realtimecollisiondetection.net/blog/?p=89
-  return std::abs(rhs - lhs) <=
+  return std::fabs(rhs - lhs) <=
          EPSILON * std::max(static_cast<FLOAT>(1.0),
                             std::max(std::abs(lhs), std::abs(rhs)));
 }
