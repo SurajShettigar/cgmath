@@ -66,6 +66,12 @@ class Vector {
 #endif  // USE_INTRINSICS
         {};
 
+  /// Construct a 3D vector from 3 floating point values.
+  explicit Vector(FLOAT x, FLOAT y, FLOAT z) : Vector{x, y, z, 0.0} {};
+
+  /// Construct a 2D vector from 2 floating point values.
+  explicit Vector(FLOAT x, FLOAT y) : Vector{x, y, 0.0, 0.0} {};
+
   /// Construct a 4D vector from an array of size 4.
   explicit Vector(const std::array<FLOAT, 4> &value)
       :
@@ -74,7 +80,10 @@ class Vector {
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
         m_value{_mm256_load_pd(value.data())}
 #else
-        m_value{_mm_set_pd(value[1], value[0]), _mm_set_pd(value[3], value[2])}
+        m_value{_mm_load_pd(value.data()),
+                _mm_load_pd(reinterpret_cast<const FLOAT *>(
+                    reinterpret_cast<const uint8_t *>(value.data()) +
+                    (2 * sizeof(FLOAT))))}
 #endif  // AVX INTRINSICS
 #else
         m_value{_mm_load_ps(value.data())}
@@ -83,6 +92,14 @@ class Vector {
         m_value{value}
 #endif  // USE_INTRINSICS
         {};
+
+  /// Construct a 3D vector from an array of size 3.
+  explicit Vector(const std::array<FLOAT, 3> &value)
+      : Vector{std::array<FLOAT, 4>{value[0], value[1], value[2], 0.0}} {};
+
+  /// Construct a 2D vector from an array of size 2.
+  explicit Vector(const std::array<FLOAT, 2> &value)
+      : Vector{std::array<FLOAT, 4>{value[0], value[1], 0.0, 0.0}} {};
 
   ~Vector() = default;
 
@@ -104,7 +121,9 @@ class Vector {
     _mm256_store_pd(data, m_value);
 #else
     _mm_store_pd(data, m_value[0]);
-    _mm_store_pd(data + (2 * sizeof(FLOAT)), m_value[1]);
+    _mm_store_pd(reinterpret_cast<FLOAT *>(reinterpret_cast<uint8_t *>(data) +
+                                           2 * sizeof(FLOAT)),
+                 m_value[1]);
 #endif  // AVX INTRINSICS
 #else
     _mm_store_ps(data, m_value);
@@ -264,14 +283,19 @@ class Vector {
 #endif  // USE_INTRINSICS
   }
 
+  inline void set(FLOAT x, FLOAT y, FLOAT z) { set(x, y, z, 0.0); }
+
+  inline void set(FLOAT x, FLOAT y) { set(x, y, 0.0, 0.0); }
+
   inline void set(const std::array<FLOAT, 4> &value) {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
     m_value = _mm256_load_pd(value.data());
 #else
-    m_value[0] = _mm_set_pd(value[1], value[0]);
-    m_value[1] = _mm_set_pd(value[3], value[2]);
+    m_value[0] = _mm_load_pd(value.data());
+    m_value[1] = _mm_load_pd(reinterpret_cast<const FLOAT *>(
+        reinterpret_cast<const uint8_t *>(value.data()) + (2 * sizeof(FLOAT))));
 #endif  // AVX INTRINSICS
 #else
     m_value = _mm_load_ps(value.data());
@@ -281,6 +305,13 @@ class Vector {
 #endif  // USE_INTRINSICS
   }
 
+  inline void set(const std::array<FLOAT, 3> &value) {
+    set(std::array<FLOAT, 4>{value[0], value[1], value[2], 0.0});
+  }
+
+  inline void set(const std::array<FLOAT, 2> &value) {
+    set(std::array<FLOAT, 4>{value[0], value[1], 0.0, 0.0});
+  }
   // Type-Conversions
   /// Convert to a human-readable string value.
   explicit inline operator std::string() const {
@@ -341,7 +372,7 @@ class Vector {
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
     return Vector(_mm256_mul_pd(lhs.m_value, Vector(rhs).m_value));
 #else
-    Vector right = Vector(rhs);
+    auto right = Vector(rhs);
     return Vector({_mm_mul_pd(lhs.m_value[0], right.m_value[0]),
                    _mm_mul_pd(lhs.m_value[1], right.m_value[1])});
 #endif  // AVX INTRINSICS
@@ -364,7 +395,7 @@ class Vector {
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
     return Vector(_mm256_div_pd(lhs.m_value, Vector(rhs).m_value));
 #else
-    Vector right = Vector(rhs);
+    auto right = Vector(rhs);
     return Vector({_mm_div_pd(lhs.m_value[0], right.m_value[0]),
                    _mm_div_pd(lhs.m_value[1], right.m_value[1])});
 #endif  // AVX INTRINSICS
@@ -404,8 +435,7 @@ class Vector {
 #else
     __m128d cmp1 = _mm_cmplt_pd(m_value[0], rhs.m_value[0]);
     __m128d cmp2 = _mm_cmplt_pd(m_value[1], rhs.m_value[1]);
-    cmp2 = _mm_cmpeq_pd(cmp1, cmp2);
-    return _mm_movemask_pd(cmp2) == 0b11;
+    return (_mm_movemask_pd(cmp1) & _mm_movemask_pd(cmp2)) == 0b11;
 #endif  // AVX INTRINSICS
 #else
     __m128 cmp = _mm_cmplt_ps(m_value, rhs.m_value);
@@ -417,21 +447,38 @@ class Vector {
 #endif  // USE_INTRINSICS
   }
 
+  inline bool operator<=(const Vector &rhs) const {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d cmp = _mm256_cmp_pd(m_value, rhs.m_value, 0x02);
+    return _mm256_movemask_pd(cmp) == 0b1111;
+#else
+    __m128d cmp1 = _mm_cmple_pd(m_value[0], rhs.m_value[0]);
+    __m128d cmp2 = _mm_cmple_pd(m_value[1], rhs.m_value[1]);
+    return (_mm_movemask_pd(cmp1) & _mm_movemask_pd(cmp2)) == 0b11;
+#endif  // AVX INTRINSICS
+#else
+    __m128 cmp = _mm_cmple_ps(m_value, rhs.m_value);
+    return _mm_movemask_ps(cmp) == 0b1111;
+#endif  // USE_DOUBLE
+#else
+    return m_value[0] <= rhs.m_value[0] && m_value[1] <= rhs.m_value[1] &&
+           m_value[2] <= rhs.m_value[2] && m_value[3] <= rhs.m_value[3];
+#endif  // USE_INTRINSICS
+  }
+
   /// Checks if two floating point values are equal. Because of floating point
   /// imprecision,
   /// == operator cannot be used directly.
   inline bool operator==(const Vector &rhs) const {
     // Refer: https://realtimecollisiondetection.net/blog/?p=89
-    return Vector::abs(*this - rhs) <
+    return Vector::abs(*this - rhs) <=
            EPSILON * Vector::max(Vector(1.0), Vector::max(Vector::abs(*this),
                                                           Vector::abs(rhs)));
   }
 
   inline bool operator!=(const Vector &rhs) const { return !(*this == rhs); }
-
-  inline bool operator<=(const Vector &rhs) const {
-    return *this < rhs || *this == rhs;
-  }
 
   inline bool operator>(const Vector &rhs) const { return rhs < *this; }
 
@@ -506,15 +553,12 @@ class Vector {
         _mm256_set1_epi64x(static_cast<int64_t>(0x8000000000000000)));
     return Vector(_mm256_andnot_pd(mask, m_value));
 #else
-    __m128d mask = _mm_castsi128_pd(
-        _mm_set1_epi64x(static_cast<int64_t>(0x8000000000000000)));
+    __m128d mask = _mm_set1_pd(-0.0);
     return Vector(
         {_mm_andnot_pd(mask, m_value[0]), _mm_andnot_pd(mask, m_value[1])});
 #endif  // AVX INTRINSICS
 #else
-    __m128 mask =
-        _mm_castsi128_ps(_mm_set1_epi32(static_cast<int32_t>(0x80000000)));
-    return Vector(_mm_andnot_ps(mask, m_value));
+    return Vector(_mm_andnot_ps(_mm_set1_ps(-0.0f), m_value));
 #endif  // USE_DOUBLE
 #else
     return Vector(std::fabs(m_value[0]), std::fabs(m_value[1]),
@@ -536,24 +580,7 @@ class Vector {
   [[nodiscard]] inline Vector normalized() const { return *this / length(); }
 
   /// Get the absolute values of each vector dimension.
-  static inline Vector abs(const Vector &vec) {
-#ifdef USE_INTRINSICS
-#ifdef USE_DOUBLE
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
-    return Vector(_mm256_andnot_pd(_mm256_set1_pd(-0.0), vec.m_value));
-#else
-    __m128d mask = _mm_set1_pd(-0.0);
-    return Vector({_mm_andnot_pd(mask, vec.m_value[0]),
-                   _mm_andnot_pd(mask, vec.m_value[1])});
-#endif  // AVX INTRINSICS
-#else
-    return Vector(_mm_andnot_ps(_mm_set1_ps(-0.0f), vec.m_value));
-#endif  // USE_DOUBLE
-#else
-    return Vector(std::fabs(vec.m_value[0]), std::fabs(vec.m_value[1]),
-                  std::fabs(vec.m_value[2]), std::fabs(vec.m_value[3]));
-#endif  // USE_INTRINSICS
-  }
+  static inline Vector abs(const Vector &vec) { return vec.abs(); }
 
   /// Returns a vector with the maximum values among two given vectors.
   static inline Vector max(const Vector &lhs, const Vector &rhs) {
@@ -670,20 +697,38 @@ class Vector {
     return Vector({_mm_sub_pd(l11, l21), _mm_sub_pd(l12, l22)});
 #endif  // AVX INTRINSICS
 #else
-    __m128 l1 = _mm_shuffle_ps(lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
-    __m128 r1 = _mm_shuffle_ps(rhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
-    __m128 l2 = _mm_shuffle_ps(lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
-    __m128 r2 = _mm_shuffle_ps(rhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+    __m128 l1 =
+        _mm_shuffle_ps(lhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+    __m128 r1 =
+        _mm_shuffle_ps(rhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+    __m128 l2 =
+        _mm_shuffle_ps(lhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+    __m128 r2 =
+        _mm_shuffle_ps(rhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
     l1 = _mm_mul_ps(l1, r1);
     l2 = _mm_mul_ps(l2, r2);
     return Vector(_mm_sub_ps(l1, l2));
 #endif  // USE_DOUBLE
 #else
+#ifndef USE_DOUBLE
+    // Static cast to double to ensure there are no rounding errors when two
+    // vectors are extremely similar.
+    auto vx = static_cast<double>(lhs.m_value[0]);
+    auto vy = static_cast<double>(lhs.m_value[1]);
+    auto vz = static_cast<double>(lhs.m_value[2]);
+    auto wx = static_cast<double>(rhs.m_value[0]);
+    auto wy = static_cast<double>(rhs.m_value[1]);
+    auto wz = static_cast<double>(rhs.m_value[2]);
+    return Vector(static_cast<FLOAT>(vy * wz - vz * wy),
+                   static_cast<FLOAT>(vz * wx - vx * wz),
+                   static_cast<FLOAT>(vx * wy - vy * wx),
+                  0.0f);
+#endif
     return Vector{
         lhs.m_value[1] * rhs.m_value[2] - lhs.m_value[2] * rhs.m_value[1],
         lhs.m_value[2] * rhs.m_value[0] - lhs.m_value[0] * rhs.m_value[2],
         lhs.m_value[0] * rhs.m_value[1] - lhs.m_value[1] * rhs.m_value[0],
-        0.0f};
+        0.0};
 #endif  // USE_INTRINSICS
   }
 
