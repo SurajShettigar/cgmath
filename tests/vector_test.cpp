@@ -1,6 +1,7 @@
 // Copyright 2023 Suraj Shettigar
 // SPDX-License-Identifier: Apache-2.0
 
+#include <benchmark/benchmark.h>
 #include <gtest/gtest.h>
 
 #include <vector2.hpp>
@@ -521,13 +522,29 @@ TEST_F(VectorTest, Vector4FunctionsLerp) {
   ASSERT_EQ(Vector4::lerp(vec1, vec2, 0.5), vec3);
 }
 
+static void Vector4BenchmarkFunction(benchmark::State &state) {
+  for (auto s : state) {
+    Vector4 val1{0.5, 0.2, 0.1, 0.0};
+    Vector4 val2{0.24, 0.1145, 1.0, 2.0};
+    FLOAT val = val1.length();
+    val = val2.length();
+    Vector4 vec = val1 + val2;
+  }
+}
+
+TEST_F(VectorTest, Vector4Benchmark) {
+  benchmark::internal::Benchmark *b = benchmark::RegisterBenchmark(
+      "Vector4Benchmark", Vector4BenchmarkFunction);
+  b->MinWarmUpTime(1);
+}
+
 TEST_F(VectorTest, VectorConversions) {
   vec2_set = static_cast<Vector2>(vec4_scalar_init);
   ASSERT_EQ_FLT(vec2_set[0], vec4_scalar_init[0]);
   ASSERT_EQ_FLT(vec2_set[1], vec4_scalar_init[1]);
 
   std::string val = static_cast<std::string>(vec2_def_init);
-  ASSERT_EQ(val, "[0.000000, 0.000000]");
+  ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000, 0.000000]");
 
   vec3_set = static_cast<Vector3>(vec2_scalar_init);
   ASSERT_EQ_FLT(vec3_set[0], vec2_scalar_init[0]);
@@ -540,7 +557,7 @@ TEST_F(VectorTest, VectorConversions) {
   ASSERT_EQ_FLT(vec3_set[2], vec4_scalar_init[2]);
 
   val = static_cast<std::string>(vec3_def_init);
-  ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000]");
+  ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000, 0.000000]");
 
   vec4_set = static_cast<Vector4>(vec2_scalar_init);
   ASSERT_EQ_FLT(vec4_set[0], vec2_scalar_init[0]);
@@ -556,4 +573,15 @@ TEST_F(VectorTest, VectorConversions) {
 
   val = static_cast<std::string>(vec4_def_init);
   ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000, 0.000000]");
+}
+
+int main(int argc, char **argv) {
+  testing::InitGoogleTest(&argc, argv);
+  int testResult = RUN_ALL_TESTS();
+  if (testResult == 0) {
+    benchmark::Initialize(&argc, argv);
+    benchmark::RunSpecifiedBenchmarks();
+    benchmark::Shutdown();
+  }
+  return testResult;
 }

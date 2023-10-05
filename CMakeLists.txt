@@ -24,8 +24,7 @@ option(INCLUDE_TESTS "Include test files and test dependencies?" ON)
 option(DOUBLE_PRECISION "Uses double precision floating point values." ON)
 option(SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
 set(SIMD_ARCH "AVX2" CACHE STRING "Target Architecture used to compile SIMD intrinsics.")
-list(APPEND SIMD_ARCH_LIST "SSE4_2" "AVX" "AVX2" "AVX512")
-set_property(CACHE SIMD_ARCH PROPERTY STRINGS SIMD_ARCH_LIST)
+set_property(CACHE SIMD_ARCH PROPERTY STRINGS "SSE4_2" "AVX" "AVX2" "AVX512")
 
 # Cmake includes
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${PROJECT_SOURCE_DIR}/ext)
@@ -47,7 +46,7 @@ if (INCLUDE_TESTS)
     enable_testing()
     add_executable(cgmath_test tests/vector_test.cpp)
     target_link_libraries(cgmath_test
-            PUBLIC GTest::gtest GTest::gtest_main
+            PUBLIC GTest::gtest benchmark::benchmark
             PRIVATE cgmath)
     add_test(NAME vector_test COMMAND cgmath_test)
 endif ()
