@@ -466,7 +466,7 @@ class Vector {
     return *this;
   }
 
-  Vector &operator-=(const Vector &rhs) {
+  inline Vector &operator-=(const Vector &rhs) {
 #ifdef USE_INTRINSICS
     *this = *this - rhs;
 #else
@@ -478,7 +478,7 @@ class Vector {
     return *this;
   }
 
-  Vector &operator*=(FLOAT rhs) {
+  inline Vector &operator*=(FLOAT rhs) {
 #ifdef USE_INTRINSICS
     *this = *this * rhs;
 #else
@@ -490,9 +490,9 @@ class Vector {
     return *this;
   }
 
-  Vector &operator/=(FLOAT rhs) { return *this *= 1.0 / rhs; }
+  inline Vector &operator/=(FLOAT rhs) { return *this *= 1.0 / rhs; }
 
-  friend std::ostream &operator<<(std::ostream &out, const Vector &vec) {
+  friend inline std::ostream &operator<<(std::ostream &out, const Vector &vec) {
     return out << static_cast<std::string>(vec);
   }
 
@@ -524,28 +524,7 @@ class Vector {
 
   /// Get the squared length / magnitude of the 4D vector.
   [[nodiscard]] inline FLOAT lengthSquared() const {
-#ifdef USE_INTRINSICS
-#ifdef USE_DOUBLE
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
-    __m256d len = _mm256_mul_pd(m_value, m_value);
-    len = _mm256_hadd_pd(len, len);
-    len = _mm256_hadd_pd(len, len);
-    return _mm256_cvtsd_f64(len);
-#else
-    __m128d a = _mm_mul_pd(m_value[0], m_value[0]);
-    __m128d b = _mm_mul_pd(m_value[1], m_value[1]);
-    b = _mm_hadd_pd(a, b);
-    b = _mm_hadd_pd(b, b);
-    return _mm_cvtsd_f64(b);
-#endif  // AVX INTRINSICS
-#else
-    __m128 len = _mm_dp_ps(m_value, m_value, 0xFF);
-    return _mm_cvtss_f32(len);
-#endif  // USE_DOUBLE
-#else
-    return m_value[0] * m_value[0] + m_value[1] * m_value[1] +
-           m_value[2] * m_value[2] + m_value[3] * m_value[3];
-#endif  // USE_INTRINSICS
+    return Vector::dot(*this, *this);
   }
 
   /// Get the length / magnitude of the 4D vector.
@@ -602,14 +581,14 @@ class Vector {
    * @param vec 4D vector whose length / magnitude needs to be found.
    * @return The length / the magnitude.
    */
-  static FLOAT length(const Vector &vec) { return vec.length(); }
+  static inline FLOAT length(const Vector &vec) { return vec.length(); }
 
   /**
    * Get a normalized vector from the given 4D vector.
    * @param vec 4D vector to normalize.
    * @return A normalized 4D vector whose length is 1.
    */
-  static Vector normalize(const Vector &vec) { return vec.normalized(); }
+  static inline Vector normalize(const Vector &vec) { return vec.normalized(); }
 
   /**
    *  Linearly interpolates between two 4D vectors.
@@ -618,8 +597,94 @@ class Vector {
    * @param t Scalar value within the  range [0, 1] to control interpolation.
    * @return An interpolated 4D vector.
    */
-  static Vector lerp(const Vector &from, const Vector &to, FLOAT t) {
+  static inline Vector lerp(const Vector &from, const Vector &to, FLOAT t) {
     return from * (1.0 - t) + to * t;
+  }
+
+  /**
+   * Find the dot product of two 4D vectors.
+   * @param lhs A 3D vector.
+   * @param rhs Another 3D vector.
+   * @return A scalar floating point value. In case of normalized vectors, value
+   * will be in the range of [-1, 1].
+   */
+  static inline FLOAT dot(const Vector &lhs, const Vector &rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d len = _mm256_mul_pd(lhs.m_value, rhs.m_value);
+    len = _mm256_hadd_pd(len, len);
+    len = _mm256_hadd_pd(len, len);
+    return _mm256_cvtsd_f64(len);
+#else
+    __m128d a = _mm_mul_pd(lhs.m_value[0], rhs.m_value[0]);
+    __m128d b = _mm_mul_pd(lhs.m_value[1], rhs.m_value[1]);
+    b = _mm_hadd_pd(a, b);
+    b = _mm_hadd_pd(b, b);
+    return _mm_cvtsd_f64(b);
+#endif  // AVX INTRINSICS
+#else
+    __m128 len = _mm_dp_ps(lhs.m_value, rhs.m_value, 0xFF);
+    return _mm_cvtss_f32(len);
+#endif  // USE_DOUBLE
+#else
+    return lhs.m_value[0] * rhs.m_value[0] + lhs.m_value[1] * rhs.m_value[1] +
+           lhs.m_value[2] * rhs.m_value[2] + lhs.m_value[3] * rhs.m_value[3];
+#endif  // USE_INTRINSICS
+  }
+
+  /**
+   * Find the cross product of two 3D vectors.
+   * @param lhs A 3D vector.
+   * @param rhs Another 3D vector.
+   * @return A 3D vector. Vector is orthogonal to LHS and RHS vector if LHS and
+   * RHS are linearly independent.
+   */
+  static inline Vector cross(const Vector &lhs, const Vector &rhs) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d l1 = _mm256_permute4x64_pd(lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+    __m256d r1 = _mm256_permute4x64_pd(rhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+    __m256d l2 = _mm256_permute4x64_pd(lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+    __m256d r2 = _mm256_permute4x64_pd(rhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+    l1 = _mm256_mul_pd(l1, r1);
+    l2 = _mm256_mul_pd(l2, r2);
+    return Vector(_mm256_sub_pd(l1, l2));
+#else
+    __m128d l11 = _mm_shuffle_pd(lhs.m_value[0], lhs.m_value[1], 0b01);
+    __m128d l12 = _mm_shuffle_pd(lhs.m_value[0], lhs.m_value[1], 0b10);
+    __m128d r11 = _mm_shuffle_pd(rhs.m_value[1], rhs.m_value[0], 0b00);
+    __m128d r12 = _mm_shuffle_pd(rhs.m_value[0], rhs.m_value[1], 0b11);
+
+    __m128d l21 = _mm_shuffle_pd(lhs.m_value[1], lhs.m_value[0], 0b00);
+    __m128d l22 = _mm_shuffle_pd(lhs.m_value[0], lhs.m_value[1], 0b11);
+    __m128d r21 = _mm_shuffle_pd(rhs.m_value[0], rhs.m_value[1], 0b01);
+    __m128d r22 = _mm_shuffle_pd(rhs.m_value[0], rhs.m_value[1], 0b10);
+
+    l11 = _mm_mul_pd(l11, r11);
+    l12 = _mm_mul_pd(l12, r12);
+    l21 = _mm_mul_pd(l21, r21);
+    l22 = _mm_mul_pd(l22, r22);
+
+    return Vector({_mm_sub_pd(l11, l21), _mm_sub_pd(l12, l22)});
+#endif  // AVX INTRINSICS
+#else
+    __m128 l1 = _mm_shuffle_ps(lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+    __m128 r1 = _mm_shuffle_ps(rhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+    __m128 l2 = _mm_shuffle_ps(lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+    __m128 r2 = _mm_shuffle_ps(rhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+    l1 = _mm_mul_ps(l1, r1);
+    l2 = _mm_mul_ps(l2, r2);
+    return Vector(_mm_sub_ps(l1, l2));
+#endif  // USE_DOUBLE
+#else
+    return Vector{
+        lhs.m_value[1] * rhs.m_value[2] - lhs.m_value[2] * rhs.m_value[1],
+        lhs.m_value[2] * rhs.m_value[0] - lhs.m_value[0] * rhs.m_value[2],
+        lhs.m_value[0] * rhs.m_value[1] - lhs.m_value[1] * rhs.m_value[0],
+        0.0f};
+#endif  // USE_INTRINSICS
   }
 
  private:
