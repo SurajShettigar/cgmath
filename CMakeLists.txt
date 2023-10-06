@@ -21,6 +21,7 @@ install(TARGETS cgmath LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 
 # Library configuration options
 option(INCLUDE_TESTS "Include test files and test dependencies?" ON)
+option(INCLUDE_BENCHMARKING_TESTS "Include benchmarking test cases?" ON)
 option(DOUBLE_PRECISION "Uses double precision floating point values." ON)
 option(SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
 set(SIMD_ARCH "AVX2" CACHE STRING "Target Architecture used to compile SIMD intrinsics.")
@@ -46,8 +47,13 @@ if (INCLUDE_TESTS)
     enable_testing()
     add_executable(cgmath_test tests/vector_test.cpp)
     target_link_libraries(cgmath_test
-            PUBLIC GTest::gtest benchmark::benchmark
+            PUBLIC GTest::gtest
             PRIVATE cgmath)
+    if(INCLUDE_BENCHMARKING_TESTS)
+        target_link_libraries(cgmath_test
+                PUBLIC benchmark::benchmark)
+        target_compile_definitions(cgmath PUBLIC BENCHMARK_TEST)
+    endif ()
     add_test(NAME vector_test COMMAND cgmath_test)
 endif ()
 

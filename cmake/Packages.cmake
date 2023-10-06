@@ -11,13 +11,15 @@ if (INCLUDE_TESTS)
         FetchContent_MakeAvailable(GTest)
         find_package(GTest 1.14.0 EXACT REQUIRED)
     endif ()
-    message("Downloading Google Benchmark...")
-    FetchContent_Declare(GBenchmark
-            GIT_REPOSITORY https://github.com/google/benchmark.git
-            GIT_TAG v1.8.3
-    )
-    FetchContent_MakeAvailable(GBenchmark)
-    set(BENCHMARK_ENABLE_TESTING OFF)
-    set(BENCHMARK_ENABLE_GTEST_TESTS OFF)
-    set(BENCHMARK_USE_BUNDLED_GTEST OFF)
+    if ($CACHE{INCLUDE_BENCHMARKING_TESTS})
+        message("Downloading Google Benchmark...")
+        FetchContent_Declare(GBenchmark
+                GIT_REPOSITORY https://github.com/google/benchmark.git
+                GIT_TAG v1.8.3
+        )
+        FetchContent_MakeAvailable(GBenchmark)
+        set(BENCHMARK_ENABLE_TESTING OFF)
+        set(BENCHMARK_ENABLE_GTEST_TESTS OFF)
+        set(BENCHMARK_USE_BUNDLED_GTEST OFF)
+    endif ()
 endif ()
