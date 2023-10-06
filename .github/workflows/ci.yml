@@ -39,14 +39,25 @@ jobs:
             c_compiler: clang
             cpp_compiler: clang++
         exclude:
+          - double_precision: OFF
+            simd_arch: SSE4_2
+          - use_simd: OFF
+            simd_arch: SSE4_2
           - os: windows-latest
             c_compiler: gcc
+            cpp_compiler: g++
           - os: windows-latest
             c_compiler: clang
+            cpp_compiler: clang++
           - os: ubuntu-latest
             c_compiler: cl
+            cpp_compiler: cl
+          - os: macos-latest
+            c_compiler: gcc
+            cpp_compiler: g++
           - os: macos-latest
             c_compiler: cl
+            cpp_compiler: cl
 
     steps:
       - uses: actions/checkout@v3
@@ -66,6 +77,11 @@ jobs:
           -DDOUBLE_PRECISION=${{ matrix.double_precision }}
           -DSIMD_INTRINSICS=${{ matrix.use_simd }}
           -DSIMD_ARCH=${{ matrix.simd_arch }}
+          -DBENCHMARK_ENABLE_TESTING:BOOL=OFF 
+          -DBENCHMARK_INSTALL_DOCS:BOOL=OFF 
+          -DBENCHMARK_USE_BUNDLED_GTEST:BOOL=OFF 
+          -DBUILD_GMOCK:BOOL=OFF 
+          -DBENCHMARK_ENABLE_GTEST_TESTS:BOOL=OFF
           -S ${{ github.workspace }}
 
       - name: Build
