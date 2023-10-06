@@ -639,14 +639,15 @@ class Vector {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
-    __m256d len = _mm256_mul_pd(lhs.m_value, rhs.m_value);
-    len = _mm256_hadd_pd(len, len);
-    len = _mm256_hadd_pd(len, len);
-    return _mm256_cvtsd_f64(len);
+    __m256d dp = _mm256_mul_pd(lhs.m_value, rhs.m_value);
+    dp = _mm256_hadd_pd(dp, dp);
+    __m128d high = _mm256_extractf128_pd(dp, 0x01);
+    high = _mm_add_pd(_mm256_castpd256_pd128(dp), high);
+    return _mm_cvtsd_f64(high);
 #else
     __m128d a = _mm_mul_pd(lhs.m_value[0], rhs.m_value[0]);
     __m128d b = _mm_mul_pd(lhs.m_value[1], rhs.m_value[1]);
-    b = _mm_hadd_pd(a, b);
+    b = _mm_add_pd(a, b);
     b = _mm_hadd_pd(b, b);
     return _mm_cvtsd_f64(b);
 #endif  // AVX INTRINSICS
@@ -700,11 +701,11 @@ class Vector {
     __m128 l1 =
         _mm_shuffle_ps(lhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
     __m128 r1 =
-        _mm_shuffle_ps(rhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
+        _mm_shuffle_ps(rhs.m_value, rhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
     __m128 l2 =
         _mm_shuffle_ps(lhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 1, 0, 2));
     __m128 r2 =
-        _mm_shuffle_ps(rhs.m_value, lhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
+        _mm_shuffle_ps(rhs.m_value, rhs.m_value, _MM_SHUFFLE(3, 0, 2, 1));
     l1 = _mm_mul_ps(l1, r1);
     l2 = _mm_mul_ps(l2, r2);
     return Vector(_mm_sub_ps(l1, l2));
@@ -720,15 +721,13 @@ class Vector {
     auto wy = static_cast<double>(rhs.m_value[1]);
     auto wz = static_cast<double>(rhs.m_value[2]);
     return Vector(static_cast<FLOAT>(vy * wz - vz * wy),
-                   static_cast<FLOAT>(vz * wx - vx * wz),
-                   static_cast<FLOAT>(vx * wy - vy * wx),
-                  0.0f);
+                  static_cast<FLOAT>(vz * wx - vx * wz),
+                  static_cast<FLOAT>(vx * wy - vy * wx), 0.0f);
 #endif
     return Vector{
         lhs.m_value[1] * rhs.m_value[2] - lhs.m_value[2] * rhs.m_value[1],
         lhs.m_value[2] * rhs.m_value[0] - lhs.m_value[0] * rhs.m_value[2],
-        lhs.m_value[0] * rhs.m_value[1] - lhs.m_value[1] * rhs.m_value[0],
-        0.0};
+        lhs.m_value[0] * rhs.m_value[1] - lhs.m_value[1] * rhs.m_value[0], 0.0};
 #endif  // USE_INTRINSICS
   }
 
