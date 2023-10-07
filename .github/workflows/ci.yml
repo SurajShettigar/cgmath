@@ -39,10 +39,16 @@ jobs:
             c_compiler: clang
             cpp_compiler: clang++
           - os: macos-latest
+            build_type: Release
+            c_compiler: clang
+            cpp_compiler: clang++
             double_precision: ON
             use_simd: OFF
             simd_arch: SSE4_2
           - os: macos-latest
+            build_type: Release
+            c_compiler: clang
+            cpp_compiler: clang++
             double_precision: OFF
             use_simd: ON
             simd_arch: SSE4_2
