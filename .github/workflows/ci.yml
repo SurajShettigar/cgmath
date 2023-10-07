@@ -39,6 +39,8 @@ jobs:
             c_compiler: clang
             cpp_compiler: clang++
           - simd_arch: SSE4_2
+            double_precision: OFF
+            use_simd: OFF
             os: macos-latest
         exclude:
           - double_precision: OFF
