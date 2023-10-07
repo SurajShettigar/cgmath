@@ -53,6 +53,8 @@ jobs:
             c_compiler: gcc
           - os: macos-latest
             c_compiler: cl
+          - os: macos-latest
+            simd_arch: AVX2
 
     steps:
       - uses: actions/checkout@v3

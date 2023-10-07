@@ -7,6 +7,8 @@
 #include "../constants.hpp"
 #include "simd.hpp"
 
+#include <cstring>
+
 namespace cgmath::internal {
 
 class Vector {
@@ -129,7 +131,7 @@ class Vector {
     _mm_store_ps(data, m_value);
 #endif  // USE_DOUBLE
 #else
-    memcpy(data, m_value.data(), m_value.size());
+    std::memcpy(data, m_value.data(), m_value.size());
 #endif  // USE_INTRINSICS
   }
 
