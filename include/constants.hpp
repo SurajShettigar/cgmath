@@ -12,12 +12,20 @@ namespace cgmath {
 typedef double FLOAT;
 #else
 typedef float FLOAT;
-#endif
+#endif  // USE_DOUBLE
 
+/**
+ * Different coordinate systems / frames. Can be either Right-Hand or Left-Hand
+ * with either Y-UP or Z-UP.
+ */
 enum class CoordinateSystem {
+  /// Right-Hand System with Y axis as up direction.
   RHS_Y_UP = 0,
+  /// Left-Hand System with Y axis as up direction.
   LHS_Y_UP = 1,
+  /// Right-Hand System with Z axis as up direction.
   RHS_Z_UP = 2,
+  /// Left-Hand System with Z axis as up direction.
   LHS_Z_UP = 3,
 };
 
@@ -39,7 +47,7 @@ static constexpr FLOAT DEGREES_TO_RADIANS = 0.017453292519943;
 /// == operator cannot be used directly.
 inline bool approxEqual(FLOAT lhs, FLOAT rhs) {
   // Refer: https://realtimecollisiondetection.net/blog/?p=89
-  return std::abs(rhs - lhs) <=
+  return std::fabs(rhs - lhs) <=
          EPSILON * std::max(static_cast<FLOAT>(1.0),
                             std::max(std::abs(lhs), std::abs(rhs)));
 }

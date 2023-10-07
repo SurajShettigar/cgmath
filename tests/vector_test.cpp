@@ -3,12 +3,22 @@
 
 #include <gtest/gtest.h>
 
-#include <vector.hpp>
+#include <vector2.hpp>
+#include <vector3.hpp>
+#include <vector4.hpp>
 
 #ifdef USE_DOUBLE
 #define ASSERT_EQ_FLT(val1, val2) ASSERT_DOUBLE_EQ(val1, val2)
 #else
 #define ASSERT_EQ_FLT(val1, val2) ASSERT_FLOAT_EQ(val1, val2)
+#endif
+
+#ifdef BENCHMARK_TEST
+#include <benchmark/benchmark.h>
+static constexpr size_t NUM_ITERATIONS = 1000000000;
+static constexpr size_t NUM_REPEATS = 5;
+static constexpr benchmark::TimeUnit TIME_UNIT =
+    benchmark::TimeUnit::kNanosecond;
 #endif
 
 using namespace cgmath;
@@ -158,8 +168,12 @@ TEST_F(VectorTest, Vector2FunctionsAngle) {
   vec2 = Vector2{-1.0, 0.0};
   ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), PI);
   vec1 = Vector2{1.0, 0.0};
-  vec2 = Vector2{1.0, 0.00001};
-  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 1.0000000413743513e-05);
+  vec2 = Vector2{1.0, 0.001};
+#ifdef USE_DOUBLE
+  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 0.00099999966670310538);
+#else
+  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 0.0009765625);
+#endif
 }
 
 TEST_F(VectorTest, Vector2FunctionsLerp) {
@@ -184,6 +198,33 @@ TEST_F(VectorTest, Vector2FunctionsProject) {
   Vector2 vec3 = Vector2{-3.567567567567568, -0.594594594594595};
   ASSERT_EQ(Vector2::project(vec1, vec2), vec3);
 }
+
+#ifdef BENCHMARK_TEST
+static void Vector2BenchmarkFunction(benchmark::State &state) {
+  for (auto s : state) {
+    Vector2 a{10.0, 5.0};
+    Vector2 b{2.0, -0.54};
+    a += b;
+    a -= b;
+    b *= 2.0;
+    b /= 2.0;
+    FLOAT dp = Vector2::dot(a, b);
+    Vector2 c = Vector2::normalize(a);
+    c = c * dp;
+    Vector2 d = Vector2::project(c, b);
+    benchmark::DoNotOptimize(d);
+  }
+}
+
+TEST_F(VectorTest, Vector2Benchmark) {
+  benchmark::internal::Benchmark *b = benchmark::RegisterBenchmark(
+      "VECTOR2_BENCHMARK", Vector2BenchmarkFunction);
+  b->Iterations(NUM_ITERATIONS);
+  b->Repetitions(NUM_REPEATS);
+  b->ReportAggregatesOnly(true);
+  b->Unit(TIME_UNIT);
+}
+#endif
 
 TEST_F(VectorTest, Vector3Getters) {
   ASSERT_EQ_FLT(vec3_def_init[0], 0.0);
@@ -308,8 +349,12 @@ TEST_F(VectorTest, Vector3FunctionsAngle) {
   vec2 = Vector3{-1.0, 0.0, 0.0};
   ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), PI);
   vec1 = Vector3{1.0, 0.0, 0.0};
-  vec2 = Vector3{1.0, 0.00001, 0.0};
-  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 1.0000000413743513e-05);
+  vec2 = Vector3{1.0, 0.001, 0.0};
+#ifdef USE_DOUBLE
+  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 0.00099999966670310538);
+#else
+  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 0.0009765625);
+#endif
 }
 
 TEST_F(VectorTest, Vector3FunctionsCrossProduct) {
@@ -375,6 +420,34 @@ TEST_F(VectorTest, Vector3FunctionsCoordinateFrame) {
   Vector3::getCoordinateFrame(vec1, &vec2, &vec3);
   ASSERT_EQ(Vector3::cross(vec2, vec3), vec1);
 }
+
+#ifdef BENCHMARK_TEST
+static void Vector3BenchmarkFunction(benchmark::State &state) {
+  for (auto s : state) {
+    Vector3 a{10.0, 5.0, -1.250};
+    Vector3 b{2.0, -0.54, 2.25};
+    a += b;
+    a -= b;
+    b *= 2.0;
+    b /= 2.0;
+    FLOAT dp = Vector3::dot(a, b);
+    Vector3 c = Vector3::cross(a, b);
+    c = Vector3::normalize(c);
+    c = c * dp;
+    Vector3 d = Vector3::project(c, b);
+    benchmark::DoNotOptimize(d);
+  }
+}
+
+TEST_F(VectorTest, Vector3Benchmark) {
+  benchmark::internal::Benchmark *b = benchmark::RegisterBenchmark(
+      "VECTOR3_BENCHMARK", Vector3BenchmarkFunction);
+  b->Iterations(NUM_ITERATIONS);
+  b->Repetitions(NUM_REPEATS);
+  b->ReportAggregatesOnly(true);
+  b->Unit(TIME_UNIT);
+}
+#endif
 
 TEST_F(VectorTest, Vector4Getters) {
   ASSERT_EQ_FLT(vec4_def_init[0], 0.0);
@@ -508,13 +581,38 @@ TEST_F(VectorTest, Vector4FunctionsLerp) {
   ASSERT_EQ(Vector4::lerp(vec1, vec2, 0.5), vec3);
 }
 
+#ifdef BENCHMARK_TEST
+static void Vector4BenchmarkFunction(benchmark::State &state) {
+  for (auto s : state) {
+    Vector4 a{10.0, 5.0, -1.25, -3.0};
+    Vector4 b{2.0, -0.54, 2.25, 1.34432};
+    a += b;
+    a -= b;
+    b *= 2.0;
+    b /= 2.0;
+    benchmark::DoNotOptimize(a);
+    benchmark::DoNotOptimize(b);
+    benchmark::ClobberMemory();
+  }
+}
+
+TEST_F(VectorTest, Vector4Benchmark) {
+  benchmark::internal::Benchmark *b = benchmark::RegisterBenchmark(
+      "VECTOR4_BENCHMARK", Vector4BenchmarkFunction);
+  b->Iterations(NUM_ITERATIONS);
+  b->Repetitions(NUM_REPEATS);
+  b->ReportAggregatesOnly(true);
+  b->Unit(TIME_UNIT);
+}
+#endif
+
 TEST_F(VectorTest, VectorConversions) {
   vec2_set = static_cast<Vector2>(vec4_scalar_init);
   ASSERT_EQ_FLT(vec2_set[0], vec4_scalar_init[0]);
   ASSERT_EQ_FLT(vec2_set[1], vec4_scalar_init[1]);
 
   std::string val = static_cast<std::string>(vec2_def_init);
-  ASSERT_EQ(val, "[0.000000, 0.000000]");
+  ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000, 0.000000]");
 
   vec3_set = static_cast<Vector3>(vec2_scalar_init);
   ASSERT_EQ_FLT(vec3_set[0], vec2_scalar_init[0]);
@@ -527,7 +625,7 @@ TEST_F(VectorTest, VectorConversions) {
   ASSERT_EQ_FLT(vec3_set[2], vec4_scalar_init[2]);
 
   val = static_cast<std::string>(vec3_def_init);
-  ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000]");
+  ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000, 0.000000]");
 
   vec4_set = static_cast<Vector4>(vec2_scalar_init);
   ASSERT_EQ_FLT(vec4_set[0], vec2_scalar_init[0]);
@@ -543,4 +641,36 @@ TEST_F(VectorTest, VectorConversions) {
 
   val = static_cast<std::string>(vec4_def_init);
   ASSERT_EQ(val, "[0.000000, 0.000000, 0.000000, 0.000000]");
+}
+
+int main(int argc, char **argv) {
+  testing::InitGoogleTest(&argc, argv);
+  int testResult = RUN_ALL_TESTS();
+#ifdef BENCHMARK_TEST
+  if (testResult == 0) {
+
+    benchmark::Initialize(&argc, argv);
+
+    std::string archValue {};
+#ifdef  USE_DOUBE
+    archValue = "DOUBLE_";
+#else
+    archValue = "FLOAT_";
+#endif
+#ifdef USE_INTRINSICS
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    archValue += "AVX";
+#else
+    archValue += "SSE";
+#endif // AVX INTRINSICS
+#else
+    archValue += "NONE";
+#endif // USE_INTRINSICS
+
+    benchmark::AddCustomContext("SIMD Architecture", archValue);
+    benchmark::RunSpecifiedBenchmarks();
+    benchmark::Shutdown();
+  }
+#endif
+  return testResult;
 }

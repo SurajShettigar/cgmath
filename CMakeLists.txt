@@ -11,9 +11,8 @@ add_library(cgmath STATIC
         src/vector2.cpp
         src/vector3.cpp
         src/vector4.cpp)
-set_target_properties(cgmath PROPERTIES VERSION ${PROJECT_VERSION}
-        PUBLIC_HEADER include/vector.hpp)
-target_include_directories(cgmath PUBLIC include)
+set_target_properties(cgmath PROPERTIES VERSION ${PROJECT_VERSION})
+target_include_directories(cgmath PUBLIC include PRIVATE internal)
 
 # Library install setup
 include(GNUInstallDirs)
@@ -22,14 +21,20 @@ install(TARGETS cgmath LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 
 # Library configuration options
 option(INCLUDE_TESTS "Include test files and test dependencies?" ON)
-option(USE_SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
+option(INCLUDE_BENCHMARKING_TESTS "Include benchmarking test cases?" ON)
 option(DOUBLE_PRECISION "Uses double precision floating point values." ON)
+option(SIMD_INTRINSICS "Use SIMD intrinsics for vector math. Much faster than scalar calculations." ON)
+set(SIMD_ARCH "AVX2" CACHE STRING "Target Architecture used to compile SIMD intrinsics.")
+set_property(CACHE SIMD_ARCH PROPERTY STRINGS "SSE4_2" "AVX" "AVX2" "AVX512")
 
-# Library dependencies
+# Cmake includes
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${PROJECT_SOURCE_DIR}/ext)
+# Library dependencies
 include(Packages)
+# Compiler setup
+include(CompilerSetup)
 
-if (USE_SIMD_INTRINSICS)
+if (SIMD_INTRINSICS)
     message("Math Library using SIMD intrinsics")
     target_compile_definitions(cgmath PUBLIC USE_INTRINSICS)
 endif ()
@@ -42,8 +47,13 @@ if (INCLUDE_TESTS)
     enable_testing()
     add_executable(cgmath_test tests/vector_test.cpp)
     target_link_libraries(cgmath_test
-            PUBLIC GTest::gtest GTest::gtest_main
+            PUBLIC GTest::gtest
             PRIVATE cgmath)
+    if(INCLUDE_BENCHMARKING_TESTS)
+        target_link_libraries(cgmath_test
+                PUBLIC benchmark::benchmark)
+        target_compile_definitions(cgmath PUBLIC BENCHMARK_TEST)
+    endif ()
     add_test(NAME vector_test COMMAND cgmath_test)
 endif ()
 

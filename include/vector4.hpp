@@ -9,11 +9,14 @@
 #include <string>
 
 #include "constants.hpp"
+#include "internal/vector.hpp"
 
 namespace cgmath {
 class Vector2;
 
 class Vector3;
+
+using Vector = internal::Vector;
 
 /**
  * 4D Floating-Point Vector
@@ -71,148 +74,126 @@ class Vector4 {
   explicit operator Vector3() const;
 
   /// Convert to a human-readable string value.
-  explicit operator std::string() const {
-    return "[" + std::to_string(m_value[0]) + ", " +
-           std::to_string(m_value[1]) + ", " + std::to_string(m_value[2]) +
-           ", " + std::to_string(m_value[3]) + "]";
+  explicit inline operator std::string() const {
+    return static_cast<std::string>(m_value);
   }
 
   // Getters / Setters
-  [[nodiscard]] inline FLOAT getX() const { return m_value[0]; }
+  [[nodiscard]] inline FLOAT getX() const { return m_value.getX(); }
 
-  [[nodiscard]] inline FLOAT getY() const { return m_value[1]; }
+  [[nodiscard]] inline FLOAT getY() const { return m_value.getY(); }
 
-  [[nodiscard]] inline FLOAT getZ() const { return m_value[2]; }
+  [[nodiscard]] inline FLOAT getZ() const { return m_value.getZ(); }
 
-  [[nodiscard]] inline FLOAT getW() const { return m_value[3]; }
+  [[nodiscard]] inline FLOAT getW() const { return m_value.getW(); }
 
-  inline void setX(FLOAT x) { m_value[0] = x; }
+  inline void setX(FLOAT x) { m_value.setX(x); }
 
-  inline void setY(FLOAT y) { m_value[1] = y; }
+  inline void setY(FLOAT y) { m_value.setY(y); }
 
-  inline void setZ(FLOAT z) { m_value[2] = z; }
+  inline void setZ(FLOAT z) { m_value.setZ(z); }
 
-  inline void setW(FLOAT w) { m_value[3] = w; }
+  inline void setW(FLOAT w) { m_value.setW(w); }
 
   inline void set(FLOAT x, FLOAT y, FLOAT z, FLOAT w) {
-    m_value[0] = x;
-    m_value[1] = y;
-    m_value[2] = z;
-    m_value[3] = w;
+    m_value.set(x, y, z, w);
   }
 
-  inline void set(const std::array<FLOAT, 4> &value) { m_value = value; }
+  inline void set(const std::array<FLOAT, 4> &value) { m_value.set(value); }
 
-  FLOAT operator[](size_t index) const { return m_value[index]; }
-
-  FLOAT &operator[](size_t index) { return m_value[index]; }
+  inline FLOAT operator[](size_t index) const { return m_value[index]; }
 
   // Operators
-  bool operator==(const Vector4 &rhs) const {
-    return approxEqual(m_value[0], rhs.m_value[0]) &&
-           approxEqual(m_value[1], rhs.m_value[1]) &&
-           approxEqual(m_value[2], rhs.m_value[2]) &&
-           approxEqual(m_value[3], rhs.m_value[3]);
+  inline bool operator==(const Vector4 &rhs) const {
+    return m_value == rhs.m_value;
   }
 
-  bool operator!=(const Vector4 &rhs) const {
-    return approxNotEqual(m_value[0], rhs.m_value[0]) ||
-           approxNotEqual(m_value[1], rhs.m_value[1]) ||
-           approxNotEqual(m_value[2], rhs.m_value[2]) ||
-           approxNotEqual(m_value[3], rhs.m_value[3]);
+  inline bool operator!=(const Vector4 &rhs) const {
+    return m_value != rhs.m_value;
   }
 
-  Vector4 operator-() const {
-    return Vector4{-m_value[0], -m_value[1], -m_value[2], -m_value[3]};
-  }
+  inline Vector4 operator-() const { return Vector4(-m_value); }
 
-  Vector4 &operator+=(const Vector4 &rhs) {
-    m_value[0] += rhs.m_value[0];
-    m_value[1] += rhs.m_value[1];
-    m_value[2] += rhs.m_value[2];
-    m_value[3] += rhs.m_value[3];
+  inline Vector4 &operator+=(const Vector4 &rhs) {
+    m_value += rhs.m_value;
     return *this;
   }
 
-  Vector4 &operator-=(const Vector4 &rhs) {
-    m_value[0] -= rhs.m_value[0];
-    m_value[1] -= rhs.m_value[1];
-    m_value[2] -= rhs.m_value[2];
-    m_value[3] -= rhs.m_value[3];
+  inline Vector4 &operator-=(const Vector4 &rhs) {
+    m_value -= rhs.m_value;
     return *this;
   }
 
-  Vector4 &operator*=(FLOAT rhs) {
-    m_value[0] *= rhs;
-    m_value[1] *= rhs;
-    m_value[2] *= rhs;
-    m_value[3] *= rhs;
+  inline Vector4 &operator*=(FLOAT rhs) {
+    m_value *= rhs;
     return *this;
   }
 
-  Vector4 &operator/=(FLOAT rhs) { return *this *= 1.0 / rhs; }
-
-  friend Vector4 operator+(const Vector4 &lhs, const Vector4 &rhs) {
-    return Vector4{
-        lhs.m_value[0] + rhs.m_value[0], lhs.m_value[1] + rhs.m_value[1],
-        lhs.m_value[2] + rhs.m_value[2], lhs.m_value[3] + rhs.m_value[3]};
+  inline Vector4 &operator/=(FLOAT rhs) {
+    m_value /= rhs;
+    return *this;
   }
 
-  friend Vector4 operator-(const Vector4 &lhs, const Vector4 &rhs) {
-    return Vector4{
-        lhs.m_value[0] - rhs.m_value[0], lhs.m_value[1] - rhs.m_value[1],
-        lhs.m_value[2] - rhs.m_value[2], lhs.m_value[3] - rhs.m_value[3]};
+  friend inline Vector4 operator+(const Vector4 &lhs, const Vector4 &rhs) {
+    return Vector4{lhs.m_value + rhs.m_value};
   }
 
-  friend Vector4 operator*(const Vector4 &lhs, FLOAT rhs) {
-    return Vector4{lhs.m_value[0] * rhs, lhs.m_value[1] * rhs,
-                   lhs.m_value[2] * rhs, lhs.m_value[3] * rhs};
+  friend inline Vector4 operator-(const Vector4 &lhs, const Vector4 &rhs) {
+    return Vector4{lhs.m_value - rhs.m_value};
   }
 
-  friend Vector4 operator*(FLOAT lhs, const Vector4 &rhs) { return rhs * lhs; }
-
-  friend Vector4 operator/(const Vector4 &lhs, FLOAT rhs) {
-    return Vector4{lhs.m_value[0] / rhs, lhs.m_value[1] / rhs,
-                   lhs.m_value[2] / rhs, lhs.m_value[3] / rhs};
+  friend inline Vector4 operator*(const Vector4 &lhs, FLOAT rhs) {
+    return Vector4{lhs.m_value * rhs};
   }
 
-  friend Vector4 operator/(FLOAT lhs, const Vector4 &rhs) {
-    return Vector4{lhs / rhs.m_value[0], lhs / rhs.m_value[1],
-                   lhs / rhs.m_value[2], lhs / rhs.m_value[3]};
+  friend inline Vector4 operator*(FLOAT lhs, const Vector4 &rhs) {
+    return Vector4{lhs * rhs.m_value};
   }
 
-  friend std::ostream &operator<<(std::ostream &out, const Vector4 &vec4) {
+  friend inline Vector4 operator/(const Vector4 &lhs, FLOAT rhs) {
+    return Vector4{lhs.m_value / rhs};
+  }
+
+  friend inline Vector4 operator/(FLOAT lhs, const Vector4 &rhs) {
+    return Vector4{lhs / rhs.m_value};
+  }
+
+  friend inline std::ostream &operator<<(std::ostream &out,
+                                         const Vector4 &vec4) {
     return out << static_cast<std::string>(vec4);
   }
 
   // Vector specific operations
   /// Get the squared length / magnitude of the 4D vector.
   [[nodiscard]] inline FLOAT lengthSquared() const {
-    return m_value[0] * m_value[0] + m_value[1] * m_value[1] +
-           m_value[2] * m_value[2] + m_value[3] * m_value[3];
+    return m_value.lengthSquared();
   }
 
   /// Get the length / magnitude of the 4D vector.
-  [[nodiscard]] inline FLOAT length() const {
-    return std::sqrt(lengthSquared());
-  }
+  [[nodiscard]] inline FLOAT length() const { return m_value.length(); }
 
   /// Normalize the given 4 vector. The 4D vector will have a length of 1.
-  [[nodiscard]] inline Vector4 normalized() const { return *this / length(); }
+  [[nodiscard]] inline Vector4 normalized() const {
+    return Vector4{m_value.normalized()};
+  }
 
   /**
    * Get the length of the given 4D vector.
    * @param vec4 4D vector whose length / magnitude needs to be found.
    * @return The length / the magnitude.
    */
-  static FLOAT length(const Vector4 &vec4) { return vec4.length(); }
+  static inline FLOAT length(const Vector4 &vec4) {
+    return Vector::length(vec4.m_value);
+  }
 
   /**
    * Get a normalized vector from the given 4D vector.
    * @param vec4 4D vector to normalize.
    * @return A normalized 4D vector whose length is 1.
    */
-  static Vector4 normalize(const Vector4 &vec4) { return vec4.normalized(); }
+  static inline Vector4 normalize(const Vector4 &vec4) {
+    return Vector4{Vector::normalize(vec4.m_value)};
+  }
 
   /**
    *  Linearly interpolates between two 4D vectors.
@@ -221,12 +202,14 @@ class Vector4 {
    * @param t Scalar value within the  range [0, 1] to control interpolation.
    * @return An interpolated 4D vector.
    */
-  static Vector4 lerp(const Vector4 &from, const Vector4 &to, FLOAT t) {
-    return from * (1.0 - t) + to * t;
+  static inline Vector4 lerp(const Vector4 &from, const Vector4 &to, FLOAT t) {
+    return Vector4{Vector::lerp(from.m_value, to.m_value, t)};
   }
 
  private:
-  std::array<FLOAT, 4> m_value{0.0, 0.0, 0.0, 0.0};
+  Vector m_value{0.0};
+
+  explicit Vector4(const Vector &vector) : m_value{vector} {};
 };
 }  // namespace cgmath
 
