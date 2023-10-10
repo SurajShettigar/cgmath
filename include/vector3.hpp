@@ -259,12 +259,12 @@ class Vector3 {
   /**
    * Projects a 3D vector onto a plane defined by the given normal.
    * @param vec The 3D vector to be projected.
-   * @param planeNormal The normal direction of the plane.
+   * @param plan_normal The normal direction of the plane.
    * @return Projected 3D vector.
    */
   static inline Vector3 projectOnPlane(const Vector3 &vec,
-                                       const Vector3 &planeNormal) {
-    return vec - project(vec, planeNormal);
+                                       const Vector3 &plan_normal) {
+    return vec - project(vec, plan_normal);
   }
 
   /**

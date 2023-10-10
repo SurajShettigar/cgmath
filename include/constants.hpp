@@ -6,6 +6,8 @@
 
 #include <cmath>
 #include <limits>
+#include <cstring>
+#include <array>
 
 namespace cgmath {
 #ifdef USE_DOUBLE

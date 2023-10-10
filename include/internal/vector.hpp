@@ -7,11 +7,12 @@
 #include "../constants.hpp"
 #include "simd.hpp"
 
-#include <cstring>
-
 namespace cgmath::internal {
 
+class Matrix;
+
 class Vector {
+  friend class Matrix;
  public:
   // Constructors / Destructors
   /// Construct a 0 initialized 4D vector.
@@ -539,7 +540,7 @@ class Vector {
     return *this;
   }
 
-  inline Vector &operator/=(FLOAT rhs) { return *this *= 1.0 / rhs; }
+  inline Vector &operator/=(FLOAT rhs) { return *this *= static_cast<float>(1.0) / rhs; }
 
   friend inline std::ostream &operator<<(std::ostream &out, const Vector &vec) {
     return out << static_cast<std::string>(vec);
@@ -627,7 +628,7 @@ class Vector {
    * @return An interpolated 4D vector.
    */
   static inline Vector lerp(const Vector &from, const Vector &to, FLOAT t) {
-    return from * (1.0 - t) + to * t;
+    return from * (static_cast<FLOAT>(1.0) - t) + to * t;
   }
 
   /**

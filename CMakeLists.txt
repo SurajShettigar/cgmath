@@ -10,7 +10,9 @@ project(cgmath
 add_library(cgmath STATIC
         src/vector2.cpp
         src/vector3.cpp
-        src/vector4.cpp)
+        src/vector4.cpp
+        src/matrix4x4.cpp
+        include/internal/matrix.hpp)
 set_target_properties(cgmath PROPERTIES VERSION ${PROJECT_VERSION})
 target_include_directories(cgmath PUBLIC include PRIVATE internal)
 
@@ -45,7 +47,8 @@ endif ()
 if (INCLUDE_TESTS)
     include(CTest)
     enable_testing()
-    add_executable(cgmath_test tests/vector_test.cpp)
+    add_executable(cgmath_test tests/vector_test.cpp
+            tests/matrix_test.cpp)
     target_link_libraries(cgmath_test
             PUBLIC GTest::gtest
             PRIVATE cgmath)
