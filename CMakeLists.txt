@@ -11,8 +11,7 @@ add_library(cgmath STATIC
         src/vector2.cpp
         src/vector3.cpp
         src/vector4.cpp
-        src/matrix4x4.cpp
-        include/internal/matrix.hpp)
+        src/matrix4x4.cpp)
 set_target_properties(cgmath PROPERTIES VERSION ${PROJECT_VERSION})
 target_include_directories(cgmath PUBLIC include PRIVATE internal)
 

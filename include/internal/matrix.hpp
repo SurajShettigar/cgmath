@@ -4,7 +4,7 @@
 #ifndef CGMATH_INTERNAL_MATRIX_HPP
 #define CGMATH_INTERNAL_MATRIX_HPP
 
-#include "vector.hpp"
+#include "matrix2x2.hpp"
 
 namespace cgmath::internal {
 
@@ -143,6 +143,16 @@ class Matrix {
   }
 
   // Operators
+  inline bool operator==(const Matrix &rhs) const {
+    return m_value[0] == rhs.m_value[0] && m_value[1] == rhs.m_value[1] &&
+           m_value[2] == rhs.m_value[2] && m_value[3] == rhs.m_value[3];
+  }
+
+  inline bool operator!=(const Matrix &rhs) const {
+    return m_value[0] != rhs.m_value[0] || m_value[1] != rhs.m_value[1] ||
+           m_value[2] != rhs.m_value[2] || m_value[3] != rhs.m_value[3];
+  }
+
   friend inline Matrix operator*(const Matrix &lhs, const Matrix &rhs) {
     Matrix temp = Matrix::transpose(rhs);
     return Matrix{Vector{Vector::dot(lhs.getRow(0), temp.getRow(0)),
@@ -163,6 +173,17 @@ class Matrix {
                          Vector::dot(lhs.getRow(3), temp.getRow(3))}};
   }
 
+  friend inline Vector operator*(const Matrix &lhs, const Vector &rhs) {
+    return Vector{
+        Vector::dot(lhs.getRow(0), rhs), Vector::dot(lhs.getRow(1), rhs),
+        Vector::dot(lhs.getRow(2), rhs), Vector::dot(lhs.getRow(3), rhs)};
+  }
+
+  // Functions
+  inline FLOAT determinant() const {
+    FLOAT determinant = 0.0;
+    return determinant;
+  }
   static inline Matrix transpose(const Matrix &matrix) {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
@@ -171,79 +192,70 @@ class Matrix {
     return matrix;
 #elif defined(__AVX2__) || defined(__AVX__)
     // x_x, y_x, x_y, y_y
-    __m256d row1 =
-        _mm256_permute2f128_pd (matrix.m_value[0].m_value, matrix.m_value[1].m_value,
-                       _MM_SHUFFLE(1, 0, 1, 0));
+    __m256d row1 = _mm256_permute2f128_pd(matrix.m_value[0].m_value,
+                                          matrix.m_value[1].m_value,
+                                          _MM_SHUFFLE(1, 0, 1, 0));
     // x_x, x_y, y_x, y_y
     row1 = _mm256_permute4x64_pd(row1, _MM_SHUFFLE(3, 1, 2, 0));
 
     // z_x, t_x, z_y, t_y
-    __m256d row2 =
-        _mm256_permute2f128_pd (matrix.m_value[0].m_value, matrix.m_value[1].m_value,
-                       _MM_SHUFFLE(3, 2, 3, 2));
+    __m256d row2 = _mm256_permute2f128_pd(matrix.m_value[0].m_value,
+                                          matrix.m_value[1].m_value,
+                                          _MM_SHUFFLE(3, 2, 3, 2));
     // z_x, z_y, t_x, t_y
     row2 = _mm256_permute4x64_pd(row2, _MM_SHUFFLE(3, 1, 2, 0));
 
     // x_z, y_z, x_w, y_w
-    __m256d row3 =
-        _mm256_permute2f128_pd (matrix.m_value[2].m_value, matrix.m_value[3].m_value,
-                       _MM_SHUFFLE(1, 0, 1, 0));
+    __m256d row3 = _mm256_permute2f128_pd(matrix.m_value[2].m_value,
+                                          matrix.m_value[3].m_value,
+                                          _MM_SHUFFLE(1, 0, 1, 0));
     // x_z, x_w, y_z, y_w
     row3 = _mm256_permute4x64_pd(row3, _MM_SHUFFLE(3, 1, 2, 0));
 
     // z_z, t_z, z_w, t_w
-    __m256d row4 =
-        _mm256_permute2f128_pd (matrix.m_value[2].m_value, matrix.m_value[3].m_value,
-                       _MM_SHUFFLE(3, 2, 3, 2));
+    __m256d row4 = _mm256_permute2f128_pd(matrix.m_value[2].m_value,
+                                          matrix.m_value[3].m_value,
+                                          _MM_SHUFFLE(3, 2, 3, 2));
     // z_z, z_w, t_z, t_w
     row4 = _mm256_permute4x64_pd(row4, _MM_SHUFFLE(3, 1, 2, 0));
 
-    return Matrix{// x_x, x_y, x_z, x_w
-                  Vector{_mm256_permute2f128_pd (row1, row3, _MM_SHUFFLE(1, 0, 1, 0))},
-                  // y_x, y_y, y_z, y_w
-                  Vector{_mm256_permute2f128_pd (row1, row3, _MM_SHUFFLE(3, 2, 3, 2))},
-                  // z_x, z_y, z_z, z_w
-                  Vector{_mm256_permute2f128_pd (row2, row4, _MM_SHUFFLE(1, 0, 1, 0))},
-                  // t_x, t_y, t_z, t_w
-                  Vector{_mm256_permute2f128_pd (row2, row4, _MM_SHUFFLE(3, 2, 3, 2))}};
+    return Matrix{
+        // x_x, x_y, x_z, x_w
+        Vector{_mm256_permute2f128_pd(row1, row3, _MM_SHUFFLE(1, 0, 1, 0))},
+        // y_x, y_y, y_z, y_w
+        Vector{_mm256_permute2f128_pd(row1, row3, _MM_SHUFFLE(3, 2, 3, 2))},
+        // z_x, z_y, z_z, z_w
+        Vector{_mm256_permute2f128_pd(row2, row4, _MM_SHUFFLE(1, 0, 1, 0))},
+        // t_x, t_y, t_z, t_w
+        Vector{_mm256_permute2f128_pd(row2, row4, _MM_SHUFFLE(3, 2, 3, 2))}};
 #else
     // x_x, x_y
-    __m128d row11 =
-        _mm_shuffle_pd(matrix.m_value[0].m_value[0],
-                       matrix.m_value[1].m_value[0], 0b00);
+    __m128d row11 = _mm_shuffle_pd(matrix.m_value[0].m_value[0],
+                                   matrix.m_value[1].m_value[0], 0b00);
     // x_z, x_w
-    __m128d row12 =
-        _mm_shuffle_pd(matrix.m_value[2].m_value[0],
-                       matrix.m_value[3].m_value[0], 0b00);
+    __m128d row12 = _mm_shuffle_pd(matrix.m_value[2].m_value[0],
+                                   matrix.m_value[3].m_value[0], 0b00);
     // y_x, y_y
-    __m128d row21 =
-        _mm_shuffle_pd(matrix.m_value[0].m_value[0],
-                       matrix.m_value[1].m_value[0], 0b11);
+    __m128d row21 = _mm_shuffle_pd(matrix.m_value[0].m_value[0],
+                                   matrix.m_value[1].m_value[0], 0b11);
     // y_z, y_w
-    __m128d row22 =
-        _mm_shuffle_pd(matrix.m_value[2].m_value[0],
-                       matrix.m_value[3].m_value[0], 0b11);
+    __m128d row22 = _mm_shuffle_pd(matrix.m_value[2].m_value[0],
+                                   matrix.m_value[3].m_value[0], 0b11);
     // z_x, z_y
-    __m128d row31 =
-        _mm_shuffle_pd(matrix.m_value[0].m_value[1],
-                       matrix.m_value[1].m_value[1], 0b00);
+    __m128d row31 = _mm_shuffle_pd(matrix.m_value[0].m_value[1],
+                                   matrix.m_value[1].m_value[1], 0b00);
     // z_z, z_w
-    __m128d row32 =
-        _mm_shuffle_pd(matrix.m_value[2].m_value[1],
-                       matrix.m_value[3].m_value[1], 0b00);
+    __m128d row32 = _mm_shuffle_pd(matrix.m_value[2].m_value[1],
+                                   matrix.m_value[3].m_value[1], 0b00);
     // t_x, t_y
-    __m128d row41 =
-        _mm_shuffle_pd(matrix.m_value[0].m_value[1],
-                       matrix.m_value[1].m_value[1], 0b11);
+    __m128d row41 = _mm_shuffle_pd(matrix.m_value[0].m_value[1],
+                                   matrix.m_value[1].m_value[1], 0b11);
     // t_z, t_w
-    __m128d row42 =
-        _mm_shuffle_pd(matrix.m_value[2].m_value[1],
-                       matrix.m_value[3].m_value[1], 0b11);
+    __m128d row42 = _mm_shuffle_pd(matrix.m_value[2].m_value[1],
+                                   matrix.m_value[3].m_value[1], 0b11);
 
-    return Matrix {Vector {{row11, row12}},
-                  Vector {{row21, row22}},
-                  Vector {{row31, row32}},
-                  Vector {{row41, row42}}};
+    return Matrix{Vector{{row11, row12}}, Vector{{row21, row22}},
+                  Vector{{row31, row32}}, Vector{{row41, row42}}};
 #endif  // AVX INTRINSICS
 #else
     // x_x, y_x, x_y, y_y
@@ -276,6 +288,11 @@ class Matrix {
     return Matrix{matrix.getRow(0), matrix.getRow(1), matrix.getRow(2),
                   matrix.getRow(3)};
 #endif  // USE_INTRINSICS
+  }
+
+  static inline Matrix inverse(const Matrix &matrix) {
+    FLOAT determinant = matrix.determinant();
+    if (approxEqual(determinant, 0.0)) return matrix;
   }
 
  private:

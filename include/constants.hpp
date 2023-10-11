@@ -8,6 +8,8 @@
 #include <limits>
 #include <cstring>
 #include <array>
+#include <string>
+#include <iostream>
 
 namespace cgmath {
 #ifdef USE_DOUBLE

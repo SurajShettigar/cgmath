@@ -9,9 +9,11 @@
 
 namespace cgmath::internal {
 
+class Matrix2x2;
 class Matrix;
 
 class Vector {
+  friend class Matrix2x2;
   friend class Matrix;
  public:
   // Constructors / Destructors
