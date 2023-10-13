@@ -79,6 +79,28 @@ TEST_F(MatrixTest, Matrix2x2Getters) {
   ASSERT_EQ(mat2_vec_init.getYAxis(), vec2);
 }
 
+TEST_F(MatrixTest, Matrix2x2Setters) {
+  Matrix2x2 mat1 = mat2_def_init;
+  mat1.setXAxis(2.0, 4.0);
+  mat1.setYAxis(-0.5, 10.4);
+  Matrix2x2 mat2 {2.0, 4.0, -0.5, 10.4};
+  ASSERT_EQ(mat1, mat2);
+
+  std::array<FLOAT, 2> x_axis{7.200045, 0.00019929};
+  std::array<FLOAT, 2> y_axis{-0.1, -100.25};
+  mat1.setXAxis(x_axis);
+  mat1.setYAxis(y_axis);
+  mat2 = Matrix2x2{x_axis, y_axis};
+  ASSERT_EQ(mat1, mat2);
+
+  Vector x_vec{7.200045, 0.00019929};
+  Vector y_vec{-0.1, -100.25};
+  mat1.setXAxis(x_vec);
+  mat1.setYAxis(y_vec);
+  mat2 = Matrix2x2{Vector{7.200045, -0.1, 0.00019929, -100.25}};
+  ASSERT_EQ(mat1, mat2);
+}
+
 TEST_F(MatrixTest, Matrix2x2Operators) {
   ASSERT_EQ(mat2_def_init, mat2_def_init);
   ASSERT_EQ(mat2_scalar_init, mat2_scalar_init);
