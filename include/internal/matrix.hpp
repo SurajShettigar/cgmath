@@ -4,8 +4,7 @@
 #ifndef CGMATH_INTERNAL_MATRIX_HPP
 #define CGMATH_INTERNAL_MATRIX_HPP
 
-#include "matrix2x2.hpp"
-#include "matrix3x3.hpp"
+#include "vector.hpp"
 
 namespace cgmath::internal {
 

@@ -16,12 +16,15 @@ class Vector2;
 
 class Vector4;
 
+class Matrix3x3;
+
 using Vector = internal::Vector;
 
 /**
  * 3D Floating-Point Vector
  */
 class Vector3 {
+  friend class Matrix3x3;
  public:
   /// [0.0, 0.0, 0.0]
   static const Vector3 ZERO;

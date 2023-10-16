@@ -23,7 +23,7 @@ class Matrix2x2 {
   explicit Matrix2x2(const std::array<FLOAT, 2> &x_axis,
                      const std::array<FLOAT, 2> &y_axis)
       : m_value{x_axis[0], y_axis[0], x_axis[1], y_axis[1]} {};
-  /// Constructs a 2x2 matrix with 2D x-axis and y-axis array values.
+  /// Constructs a 2x2 matrix with 2D x-axis and y-axis vector values.
   explicit Matrix2x2(const Vector &x_axis, const Vector &y_axis) {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
@@ -189,6 +189,8 @@ class Matrix2x2 {
                   Vector::dot(lhs.getRow(1), rhs), 0.0, 0.0};
   }
 
+  // TODO: Implement matrix2x2-scalar multiplication.
+
   // Type-Conversions
   /// Convert to a human-readable string value.
   explicit inline operator std::string() const {
@@ -275,13 +277,13 @@ class Matrix2x2 {
     adj.m_value = _mm256_permute4x64_pd(adj.m_value, _MM_SHUFFLE(0, 2, 1, 3));
     adj.m_value = _mm256_xor_pd(adj.m_value, neg_mask);
 #else
-    __m128d neg_mask = _mm_set_pd(0.0, -0.0);
-    adj.m_value[0] =
-        _mm_shuffle_pd(adj.m_value[1], adj.m_value[0], _MM_SHUFFLE2(1, 1));
-    adj.m_value[1] =
-        _mm_shuffle_pd(adj.m_value[0], adj.m_value[1], _MM_SHUFFLE2(0, 0));
-    adj.m_value[0] = _mm_xor_pd(adj.m_value[0], neg_mask);
-    adj.m_value[1] = _mm_xor_pd(adj.m_value[1], neg_mask);
+    // | a    b | ==> | d  -b |
+    // | c    d |     |-c   a |
+    __m128d neg_mask = _mm_set_pd(-0.0, 0.0);
+    __m128d row0 = _mm_shuffle_pd(adj.m_value[1], adj.m_value[0], _MM_SHUFFLE2(1, 1));
+    __m128d row1 = _mm_shuffle_pd(adj.m_value[0], adj.m_value[1], _MM_SHUFFLE2(0, 0));
+    adj.m_value[0] = _mm_xor_pd(row0, neg_mask);
+    adj.m_value[1] = _mm_xor_pd(row1, neg_mask);
     adj.m_value[1] =
         _mm_shuffle_pd(adj.m_value[1], adj.m_value[1], _MM_SHUFFLE2(0, 1));
 #endif  // AVX INTRINSICS

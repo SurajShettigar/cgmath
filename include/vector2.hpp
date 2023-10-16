@@ -16,11 +16,14 @@ class Vector3;
 
 class Vector4;
 
+class Matrix2x2;
+
 using Vector = internal::Vector;
 /**
  * 2D Floating-Point Vector
  */
 class Vector2 {
+  friend class Matrix2x2;
  public:
   /// [0.0, 0.0]
   static const Vector2 ZERO;
