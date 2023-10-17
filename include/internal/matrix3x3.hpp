@@ -586,6 +586,104 @@ class Matrix3x3 {
     return determinant * adj;
   }
 
+  /**
+   * Creates a 2D scaling matrix from the given x and y axis scales.
+   * @param scale 2D vector containing the x and y axis scales.
+   * @return 3x3 Affine transform matrix containing only the scale component.
+   */
+  static inline Matrix3x3 scale(const Vector &scale) {
+    return Matrix3x3{Vector{scale[0], 0.0, 0.0, 0.0},
+                     Vector{0.0, scale[1], 0.0, 0.0},
+                     Vector{0.0, 0.0, 1.0, 0.0}};
+  }
+
+  /**
+   * Creates a 2D rotation matrix from the given angle in degree.
+   * @param angle A scalar angle given in degree. The angle is assumed positive
+   * for counter-clockwise rotation and negative for clockwise rotation.
+   * @return 3x3 Affine transform matrix containing only the rotational
+   * component.
+   */
+  static inline Matrix3x3 rotation(FLOAT angle) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m128d theta = _mm_set1_pd(angle);
+    __m128d cos = _mm_cosd_pd(theta);
+    __m128d sin = _mm_sind_pd(theta);
+    // [cos, sin]
+    __m128d val = _mm_shuffle_pd(cos, sin, 0b00);
+    // [cos, sin, 0, 0]
+    __m256d x = _mm256_set_m128d(_mm_setzero_pd(), val);
+    // [sin, cos]
+    val = _mm_shuffle_pd(val, val, 0b01);
+    // [-sin, cos]
+    val = _mm_xor_pd(val, _mm_set_pd(-0.0, 0.0));
+    // [-sin, cos, 0, 0]
+    __m256d y = _mm256_set_m128d(_mm_setzero_pd(), val);
+    return Matrix3x3{Vector{x}, Vector{y}, Vector{0.0, 0.0, 1.0, 0.0}};
+#else
+    __m128d theta = _mm_set1_pd(angle);
+    __m128d cos = _mm_cosd_pd(theta);
+    __m128d sin = _mm_sind_pd(theta);
+    // [cos, sin]
+    __m128d x = _mm_shuffle_pd(cos, sin, 0b00);
+    // [sin, cos]
+    __m128d y = _mm_shuffle_pd(x, x, 0b01);
+    // [-sin, cos]
+    y = _mm_xor_pd(y, _mm_set_pd(-0.0, 0.0));
+    return Matrix3x3{Vector{{x, _mm_setzero_pd()}},
+                     Vector{{y, _mm_setzero_pd()}}, Vector{0.0, 0.0, 1.0, 0.0}};
+#endif  // AVX INTRINSICS
+#else
+    __m128 theta = _mm_set1_ps(angle);
+    __m128 cos = _mm_cosd_ps(theta);
+    __m128 sin = _mm_sind_ps(theta);
+    // [cos, sin, sin, sin]
+    __m128 x = _mm_move_ss(sin, cos);
+    // [cos, sin, 0, 0]
+    x = _mm_movelh_ps(x, _mm_setzero_ps());
+    // [sin, cos, cos, cos]
+    __m128 y = _mm_move_ss(cos, sin);
+    // [sin, cos, 0, 0]
+    y = _mm_movelh_ps(y, _mm_setzero_ps());
+    // [-sin, cos, 0, 0]
+    y = _mm_xor_ps(val, _mm_set_ps(-0.0f, 0.0f, 0.0f, 0.0f));
+    return Matrix3x3{Vector{x}, Vector{y}, Vector{0.0f, 0.0f, 1.0f, 0.0f}};
+#endif  // USE_DOUBLE
+#else
+    const FLOAT cos = std::cos(radian(angle));
+    const FLOAT sin = std::sin(radian(angle));
+    return Matrix3x3{cos, sin, 0.0, -sin, cos, 0.0, 0.0, 0.0, 1.0};
+#endif  // USE_INTRINSICS
+  }
+
+  /**
+   * Creates a 2D translation matrix from the given x and y axis values.
+   * @param translate 2D vector containing the x and y axis translation
+   * values.
+   * @return 3x3 Affine transform matrix containing only the translation
+   * component.
+   */
+  static inline Matrix3x3 translation(const Vector &translate)
+  {
+    auto z = translate;
+    z.setZ(1.0);
+    return Matrix3x3 {Vector{1.0, 0.0, 0.0, 0.0}, Vector{1.0, 0.0, 0.0, 0.0}, z};
+  }
+
+  /**
+   * Returns the inverse of the given 3x3 affine transformation matrix.
+   * The matrix should have only translation, rotation and scaling components.
+   * @param transform_matrix The transform matrix to invert.
+   * @return 3x3 inverse affine transformation matrix
+   */
+  static inline Matrix3x3 transformInverse(const Matrix3x3 &transform_matrix)
+  {
+    // TODO: Find 3x3 inverse Affine transformation.
+    return transform_matrix;
+  }
+
  private:
   std::array<Vector, 3> m_value{};
   explicit Matrix3x3(const std::array<Vector, 3> &value) : m_value{value} {};

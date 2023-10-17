@@ -207,10 +207,10 @@ class Vector3 {
    * rotated by that angle to produce the second vector.
    * @param lhs First 3D vector.
    * @param rhs Other 3D vector.
-   * @return Angle in radians between two 3D vectors.
+   * @return Angle in degrees between two 3D vectors.
    */
   static inline FLOAT angle(const Vector3 &lhs, const Vector3 &rhs) {
-    return acos(dot(lhs, rhs) / (lhs.length() * rhs.length()));
+    return degree(acos(dot(lhs, rhs) / (lhs.length() * rhs.length())));
   }
 
   /**

@@ -199,10 +199,10 @@ class Vector2 {
    * rotated by that angle to produce the second vector.
    * @param lhs First 2D vector.
    * @param rhs Other 2D vector.
-   * @return Angle in radians between two 2D vectors.
+   * @return Angle in degrees between two 2D vectors.
    */
   static inline FLOAT angle(const Vector2 &lhs, const Vector2 &rhs) {
-    return acos(dot(lhs, rhs) / (lhs.length() * rhs.length()));
+    return degree(acos(dot(lhs, rhs) / (lhs.length() * rhs.length())));
   }
 
   /**

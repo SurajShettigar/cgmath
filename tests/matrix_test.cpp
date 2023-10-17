@@ -53,7 +53,7 @@ TEST_F(MatrixTest, Matrix2x2Getters) {
   Vector2 vec2{0.0, 1.0};
   ASSERT_EQ(mat2_def_init[0], vec1);
   ASSERT_EQ(mat2_def_init[1], vec2);
-  ;
+
   ASSERT_EQ(mat2_def_init.getRow(0), vec1);
   ASSERT_EQ(mat2_def_init.getRow(1), vec2);
   ASSERT_EQ(mat2_def_init.getColumn(0), vec1);
@@ -130,8 +130,16 @@ TEST_F(MatrixTest, Matrix2x2Operators) {
   Vector2 vec3 = Vector2{10.2563825, 5.128191250};
   ASSERT_EQ(vec2, vec3);
 
-  // TODO: Test matrix2x2 scalar multiplication.
-  // TODO: Test matrix2x2 string conversion.
+  mat1 = mat2_def_init * 2.0;
+  mat2 = Matrix2x2{2.0, 0.0, 0.0, 2.0};
+  ASSERT_EQ(mat1, mat2);
+
+  mat1 = 10.0 * mat2_scalar_init;
+  mat2 = Matrix2x2{10.0, 5.0, -2.5, -1.25};
+  ASSERT_EQ(mat1, mat2);
+
+  std::string matStr = "[1.000000, 0.000000\n0.000000, 1.000000]";
+  ASSERT_EQ(static_cast<std::string>(mat2_def_init), matStr);
 }
 
 TEST_F(MatrixTest, Matrix2x2Setters) {
@@ -297,8 +305,18 @@ TEST_F(MatrixTest, Matrix3x3Operators) {
   Vector3 vec3 = Vector3{11.80839125, 6.314176, -9.512795};
   ASSERT_EQ(vec2, vec3);
 
-  // TODO: Test matrix3x3 scalar multiplication.
-  // TODO: Test matrix3x3 string conversion.
+  mat1 = mat3_def_init * 2.0;
+  mat2 = Matrix3x3{2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0};
+  ASSERT_EQ(mat1, mat2);
+
+  mat1 = 10.0 * mat3_scalar_init;
+  mat2 = Matrix3x3{10.0, 5.0, -2.5, -1.25, 8.0, 15.0, 4.5, 3.5, -20.0};
+  ASSERT_EQ(mat1, mat2);
+
+  std::string matStr =
+      "[1.000000, 0.000000, 0.000000\n0.000000, 1.000000, 0.000000\n0.000000, "
+      "0.000000, 1.000000]";
+  ASSERT_EQ(static_cast<std::string>(mat3_def_init), matStr);
 }
 
 TEST_F(MatrixTest, Matrix3x3Setters) {
@@ -355,14 +373,9 @@ TEST_F(MatrixTest, Matrix3x3FunctionsInverse) {
                   -1.957446808510638, -4.49645390070922,  -0.6666666666666667,
                   -0.425531914893617, -1.702127659574468, 0.0};
   ASSERT_EQ(Matrix3x3::inverse(mat3_arr_init), mat);
-  mat = Matrix3x3{0.000066569403837897021,
-                  0.000050576477938862198,
-                  -0.00010356167386729587,
-                  -0.00028788048297582672,
-                  0.00082468749019457542,
-                  -0.00089031468379841395,
-                  0.00013181439930137358,
-                  -0.00019775010655732485,
-                  0.00040835773492178042};
+  mat = Matrix3x3{
+      0.000066569403837897021, 0.000050576477938862198, -0.00010356167386729587,
+      -0.00028788048297582672, 0.00082468749019457542,  -0.00089031468379841395,
+      0.00013181439930137358,  -0.00019775010655732485, 0.00040835773492178042};
   ASSERT_EQ(Matrix3x3::inverse(mat3_vec_init), mat);
 }

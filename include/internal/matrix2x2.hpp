@@ -189,7 +189,15 @@ class Matrix2x2 {
                   Vector::dot(lhs.getRow(1), rhs), 0.0, 0.0};
   }
 
-  // TODO: Implement matrix2x2-scalar multiplication.
+  /// Matrix-scalar multiplication.
+  friend inline Matrix2x2 operator*(const Matrix2x2 &lhs, FLOAT rhs) {
+    return Matrix2x2 {lhs.m_value * rhs};
+  }
+
+  /// Matrix-scalar multiplication.
+  friend inline Matrix2x2 operator*(FLOAT lhs, const Matrix2x2 &rhs) {
+    return Matrix2x2 {lhs * rhs.m_value};
+  }
 
   // Type-Conversions
   /// Convert to a human-readable string value.
