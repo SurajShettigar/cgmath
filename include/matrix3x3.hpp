@@ -5,6 +5,7 @@
 #define CGMATH_MATRIX3X3_HPP
 
 #include "internal/matrix3x3.hpp"
+#include "vector2.hpp"
 #include "vector3.hpp"
 
 namespace cgmath {
@@ -172,6 +173,59 @@ class Matrix3x3 {
   /// Otherwise returns the original matrix as is.
   static inline Matrix3x3 inverse(const Matrix3x3 &matrix) {
     return Matrix3x3{internal::Matrix3x3::inverse(matrix.m_value)};
+  }
+
+  /**
+   * Creates a 2D scaling matrix from the given scale values.
+   * @param scale A 2D vector containing scaling values for x and y axis.
+   * @return 3x3 Affine transform matrix containing only the scaling
+   * component.
+   */
+  static inline Matrix3x3 scale(const Vector2 &scale) {
+    return Matrix3x3{internal::Matrix3x3::scale(scale.m_value)};
+  }
+
+  /**
+   * Creates a 2D rotation matrix from the given angle in degree.
+   * @param angle A scalar angle given in degree. The angle is assumed positive
+   * for counter-clockwise rotation and negative for clockwise rotation.
+   * @return 3x3 Affine transform matrix containing only the rotational
+   * component.
+   */
+  static inline Matrix3x3 rotation(FLOAT angle) {
+    return Matrix3x3{internal::Matrix3x3::rotation(angle)};
+  }
+
+  /**
+   * Creates a 2D translation matrix from the given x and y axis values.
+   * @param translate 2D vector containing the x and y axis translation
+   * values.
+   * @return 3x3 Affine transform matrix containing only the translation
+   * component.
+   */
+  static inline Matrix3x3 translation(const Vector2 &translate) {
+    return Matrix3x3{internal::Matrix3x3::translation(translate.m_value)};
+  }
+
+  /**
+   * Returns the inverse of the given 3x3 affine transformation matrix.
+   * The matrix should have only translation, rotation and scaling components.
+   * @param mat The transform matrix to invert.
+   * @return 3x3 inverse affine transformation matrix
+   */
+  static inline Matrix3x3 transformInverse(const Matrix3x3 &mat) {
+    return Matrix3x3{internal::Matrix3x3::transformInverse(mat.m_value)};
+  }
+
+  /**
+   * Returns the inverse of the given 3x3 affine transformation matrix with unit
+   * scale. The matrix should have only translation and rotation components.
+   * @param mat The transform matrix to invert.
+   * @return 3x3 inverse affine transformation matrix
+   */
+  static inline Matrix3x3 transformInverseUnitScale(const Matrix3x3 &mat) {
+    return Matrix3x3{
+        internal::Matrix3x3::transformInverseUnitScale(mat.m_value)};
   }
 
  private:

@@ -38,13 +38,13 @@ static constexpr FLOAT EPSILON = MACHINE_EPSILON * 4.0;
 static constexpr FLOAT INFINITE = std::numeric_limits<FLOAT>::infinity();
 
 /// π
-static constexpr FLOAT PI = 3.141592653589793;
+static constexpr FLOAT PI = 3.1415926535897932384626433832795;
 /// 1 / π
-static constexpr FLOAT ONE_OVER_PI = 0.318309886183791;
+static constexpr FLOAT ONE_OVER_PI = 0.31830988618379067153776752674503;
 /// 180 / π
-static constexpr FLOAT RADIANS_TO_DEGREES = 57.295779513082321;
+static constexpr FLOAT RADIANS_TO_DEGREES = 57.295779513082320876798154814105;
 /// π / 180
-static constexpr FLOAT DEGREES_TO_RADIANS = 0.017453292519943;
+static constexpr FLOAT DEGREES_TO_RADIANS = 0.01745329251994329576923690768489;
 
 /// Checks if two floating point values are equal. Because of floating point
 /// imprecision,

@@ -379,3 +379,101 @@ TEST_F(MatrixTest, Matrix3x3FunctionsInverse) {
       0.00013181439930137358,  -0.00019775010655732485, 0.00040835773492178042};
   ASSERT_EQ(Matrix3x3::inverse(mat3_vec_init), mat);
 }
+
+TEST_F(MatrixTest, Matrix3x3FunctionsScale) {
+  Matrix3x3 mat = Matrix3x3::scale(Vector2{0.5, 0.5});
+  Matrix3x3 res{0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix3x3FunctionsRotation) {
+  Matrix3x3 mat = Matrix3x3::rotation(45.0);
+  Matrix3x3 res{0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                -0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                0.0,
+                0.0,
+                1.0};
+  ASSERT_EQ(mat, res);
+  mat = Matrix3x3::rotation(0.00001);
+  res = Matrix3x3{0.9999999999999848,
+                  0.0000001745329252,
+                  0.0,
+                  -0.0000001745329252,
+                  0.9999999999999848,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0};
+  ASSERT_EQ(mat, res);
+  mat = Matrix3x3::rotation(-10.5);
+  res = Matrix3x3{0.9832549075639546,
+                  -0.1822355254921475,
+                  0.0,
+                  0.1822355254921475,
+                  0.9832549075639546,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix3x3FunctionsTranslation) {
+  Matrix3x3 mat = Matrix3x3::translation(Vector2{1.0, 0.5});
+  Matrix3x3 res{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.5, 1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix3x3FunctionsTransformInverse) {
+  Matrix3x3 mat = Matrix3x3::translation(Vector2{1.0, 0.5}) *
+                  Matrix3x3::rotation(45.0) *
+                  Matrix3x3::scale(Vector2{0.5, 0.5});
+  Matrix3x3 res{0.3535533905932738,
+                0.3535533905932738,
+                0.0,
+                -0.3535533905932738,
+                0.3535533905932738,
+                0.0,
+                1.0,
+                0.5,
+                1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix3x3::transformInverse(mat);
+  res = Matrix3x3{1.4142135623730949,  -1.4142135623730949, 0.0,
+                  1.4142135623730949,  1.4142135623730949,  0.0,
+                  -2.1213203435596424, 0.7071067811865475,  1.0};
+  ASSERT_EQ(mat, res);
+  mat = Matrix3x3::inverse(Matrix3x3::scale(Vector2{0.5, 0.5})) *
+        Matrix3x3::inverse(Matrix3x3::rotation(45.0)) *
+        Matrix3x3::inverse(Matrix3x3::translation(Vector2{1.0, 0.5}));
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix3x3FunctionsTransformInverseUnitScale) {
+  Matrix3x3 mat = Matrix3x3::translation(Vector2{1.0, 0.5}) *
+                  Matrix3x3::rotation(45.0);
+  Matrix3x3 res{0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                -0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                1.0,
+                0.5,
+                1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix3x3::transformInverseUnitScale(mat);
+  res = Matrix3x3{0.7071067811865475288016887242097,  -0.7071067811865475288016887242097, 0.0,
+                  0.7071067811865475288016887242097,  0.7071067811865475288016887242097,  0.0,
+                  -1.0606601717798213, 0.3535533905932738,  1.0};
+  ASSERT_EQ(mat, res);
+  mat = Matrix3x3::inverse(Matrix3x3::rotation(45.0)) *
+        Matrix3x3::inverse(Matrix3x3::translation(Vector2{1.0, 0.5}));
+  ASSERT_EQ(mat, res);
+}

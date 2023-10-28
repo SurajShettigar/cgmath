@@ -615,25 +615,27 @@ class Matrix3x3 {
     __m128d val = _mm_shuffle_pd(cos, sin, 0b00);
     // [cos, sin, 0, 0]
     __m256d x = _mm256_set_m128d(_mm_setzero_pd(), val);
+    // [cos, -sin, 0, 0]
+    x = _mm256_xor_pd(x, _mm256_set_pd(0.0, 0.0, -0.0, 0.0));
     // [sin, cos]
     val = _mm_shuffle_pd(val, val, 0b01);
-    // [-sin, cos]
-    val = _mm_xor_pd(val, _mm_set_pd(-0.0, 0.0));
-    // [-sin, cos, 0, 0]
+    // [sin, cos, 0, 0]
     __m256d y = _mm256_set_m128d(_mm_setzero_pd(), val);
-    return Matrix3x3{Vector{x}, Vector{y}, Vector{0.0, 0.0, 1.0, 0.0}};
+    return Matrix3x3{std::array<Vector, 3>{Vector{x}, Vector{y},
+                                           Vector{0.0, 0.0, 1.0, 0.0}}};
 #else
     __m128d theta = _mm_set1_pd(angle);
     __m128d cos = _mm_cosd_pd(theta);
     __m128d sin = _mm_sind_pd(theta);
     // [cos, sin]
-    __m128d x = _mm_shuffle_pd(cos, sin, 0b00);
+    __m128d row0 = _mm_shuffle_pd(cos, sin, 0b00);
     // [sin, cos]
-    __m128d y = _mm_shuffle_pd(x, x, 0b01);
-    // [-sin, cos]
-    y = _mm_xor_pd(y, _mm_set_pd(-0.0, 0.0));
-    return Matrix3x3{Vector{{x, _mm_setzero_pd()}},
-                     Vector{{y, _mm_setzero_pd()}}, Vector{0.0, 0.0, 1.0, 0.0}};
+    __m128d row1 = _mm_shuffle_pd(row0, row0, 0b01);
+    // [cos, -sin]
+    row0 = _mm_xor_pd(row0, _mm_set_pd(-0.0, 0.0));
+    return Matrix3x3{std::array<Vector, 3>{Vector{{row0, _mm_setzero_pd()}},
+                                           Vector{{row1, _mm_setzero_pd()}},
+                                           Vector{0.0, 0.0, 1.0, 0.0}}};
 #endif  // AVX INTRINSICS
 #else
     __m128 theta = _mm_set1_ps(angle);
@@ -643,13 +645,14 @@ class Matrix3x3 {
     __m128 x = _mm_move_ss(sin, cos);
     // [cos, sin, 0, 0]
     x = _mm_movelh_ps(x, _mm_setzero_ps());
+    // [cos, -sin, 0, 0]
+    x = _mm_xor_ps(x, _mm_set_ps(0.0f, 0.0f, -0.0f, 0.0f));
     // [sin, cos, cos, cos]
     __m128 y = _mm_move_ss(cos, sin);
     // [sin, cos, 0, 0]
     y = _mm_movelh_ps(y, _mm_setzero_ps());
-    // [-sin, cos, 0, 0]
-    y = _mm_xor_ps(val, _mm_set_ps(-0.0f, 0.0f, 0.0f, 0.0f));
-    return Matrix3x3{Vector{x}, Vector{y}, Vector{0.0f, 0.0f, 1.0f, 0.0f}};
+    return Matrix3x3{std::array<Vector, 3>{Vector{x}, Vector{y},
+                                           Vector{0.0f, 0.0f, 1.0f, 0.0f}}};
 #endif  // USE_DOUBLE
 #else
     const FLOAT cos = std::cos(radian(angle));
@@ -668,7 +671,7 @@ class Matrix3x3 {
   static inline Matrix3x3 translation(const Vector &translate) {
     auto z = translate;
     z.setZ(1.0);
-    return Matrix3x3{Vector{1.0, 0.0, 0.0, 0.0}, Vector{1.0, 0.0, 0.0, 0.0}, z};
+    return Matrix3x3{Vector{1.0, 0.0, 0.0, 0.0}, Vector{0.0, 1.0, 0.0, 0.0}, z};
   }
 
   /**
@@ -734,7 +737,45 @@ class Matrix3x3 {
         Vector{_mm256_set_m128d(_mm256_extractf128_pd(t, 0b1), y_axis)},
         mat.m_value[2]}};
 #else
-    // TODO: Add 2D Affine transform matrix inverse for SSE double precision.
+    // [x_x², y_x²]
+    __m128d xy_scale =
+        _mm_mul_pd(mat.m_value[0].m_value[0], mat.m_value[0].m_value[0]);
+    // [x_x² + x_y², y_x² + y_y²]
+    xy_scale = _mm_add_pd(xy_scale, _mm_mul_pd(mat.m_value[1].m_value[0],
+                                               mat.m_value[1].m_value[0]));
+    // if value almost equals 0, set it to 1 to avoid divide by zero error.
+    xy_scale = _mm_blendv_pd(xy_scale, _mm_set1_pd(1.0),
+                             _mm_cmplt_pd(xy_scale, _mm_set1_pd(EPSILON)));
+    // [1/|x|², 1/|y|²]
+    xy_scale = _mm_div_pd(_mm_set1_pd(1.0), xy_scale);
+
+    // [x_x', y_x']
+    __m128d row0 = _mm_mul_pd(xy_scale, mat.m_value[0].m_value[0]);
+    // [x_y', y_y']
+    __m128d row1 = _mm_mul_pd(xy_scale, mat.m_value[1].m_value[0]);
+
+    // [t_x, t_y]
+    __m128d tmp = _mm_shuffle_pd(mat.m_value[0].m_value[1],
+                                 mat.m_value[1].m_value[1], _MM_SHUFFLE2(0, 0));
+    // [-t_x, -t_y]
+    tmp = _mm_xor_pd(tmp, _mm_set_pd1(-0.0));
+
+    // [-t_x*x_x', -t_x*y_x']
+    __m128d t1 = _mm_mul_pd(_mm_shuffle_pd(tmp, tmp, _MM_SHUFFLE2(0, 0)), row0);
+    // [-t_y*x_y', -t_y*y_y']
+    __m128d t2 = _mm_mul_pd(_mm_shuffle_pd(tmp, tmp, _MM_SHUFFLE2(1, 1)), row1);
+    // [dot(-t, x'), dot(-t, y')]
+    tmp = _mm_add_pd(t1, t2);
+
+    // [dot(-t, x'), 0]
+    t1 = _mm_shuffle_pd(tmp, _mm_setzero_pd(), _MM_SHUFFLE2(0, 0));
+    // [dot(-t, y'), 0]
+    t2 = _mm_shuffle_pd(tmp, _mm_setzero_pd(), _MM_SHUFFLE2(0, 1));
+
+    return Matrix3x3{std::array<Vector, 3>{
+        Vector{{_mm_shuffle_pd(row0, row1, _MM_SHUFFLE2(0, 0)), t1}},
+        Vector{{_mm_shuffle_pd(row0, row1, _MM_SHUFFLE2(1, 1)), t2}},
+        mat.m_value[2]}};
 #endif  // AVX INTRINSICS
 #else
     // [x_x², y_x², t_x², 0]
@@ -784,21 +825,127 @@ class Matrix3x3 {
         mat.m_value[2]}};
 #endif  // USE_DOUBLE
 #else
-    const Vector x_axis{mat.m_value[0][0], mat.m_value[1][0]};
-    const Vector y_axis{mat.m_value[0][1], mat.m_value[1][1]};
-    const Vector minus_t{-mat.m_value[0][2], -mat.m_value[1][2],
-                         mat.m_value[2][2]};
-    const FLOAT x_inv_scale = 1.0 / x_axis.lengthSquared();
-    const FLOAT y_inv_scale = 1.0 / y_axis.lengthSquared();
-    return Matrix3x3{x_inv_scale * x_axis[0],
-                     y_inv_scale * y_axis[0],
-                     0.0,
-                     x_inv_scale * x_axis[1],
-                     y_inv_scale * y_axis[1],
-                     0.0,
-                     Vector::dot(minus_t, x_inv_scale * x_axis),
-                     Vector::dot(minus_t, y_inv_scale * y_axis),
-                     1.0};
+    Vector x_axis{mat.m_value[0][0], mat.m_value[1][0]};
+    Vector y_axis{mat.m_value[0][1], mat.m_value[1][1]};
+    Vector minus_t{-mat.m_value[0][2], -mat.m_value[1][2]};
+    const FLOAT x_inv_scale = static_cast<FLOAT>(1.0) / x_axis.lengthSquared();
+    const FLOAT y_inv_scale = static_cast<FLOAT>(1.0) / y_axis.lengthSquared();
+
+    x_axis *= x_inv_scale;
+    y_axis *= y_inv_scale;
+    minus_t =
+        Vector{Vector::dot(minus_t, x_axis), Vector::dot(minus_t, y_axis), 1.0};
+
+    x_axis.setZ(minus_t.getX());
+    y_axis.setZ(minus_t.getY());
+    return Matrix3x3{std::array<Vector, 3>{x_axis, y_axis, mat.m_value[2]}};
+#endif  // USE_INTRINSICS
+  }
+
+  /**
+   * Returns the inverse of the given 3x3 affine transformation matrix with unit
+   * scale. The matrix should have only translation and rotation components.
+   * @param mat The transform matrix to invert.
+   * @return 3x3 inverse affine transformation matrix
+   */
+  static inline Matrix3x3 transformInverseUnitScale(const Matrix3x3 &mat) {
+    // | x_x    y_x   t_x |     | x_x   x_y   dot(-t, x) |
+    // | x_y    y_y   t_y | =>  | y_x   y_y   dot(-t, y) |
+    // |  0      0     1  |     |  0     0        1      |
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    // [x_x, x_y, t_x, t_y]
+    __m256d t0 = _mm256_shuffle_pd(mat.m_value[0].m_value,
+                                   mat.m_value[1].m_value, 0b0000);
+    // [y_x, y_y, t_x, t_y]
+    __m256d t1 = _mm256_shuffle_pd(mat.m_value[0].m_value,
+                                   mat.m_value[1].m_value, 0b0011);
+    // [x_x, x_y, y_x, y_y]
+    __m256d xy = _mm256_permute2f128_pd(t0, t1, _MM_SHUFFLE(0, 2, 0, 0));
+    // [t_x, t_y, t_x, t_y]
+    t0 = _mm256_permute2f128_pd(t0, t1, _MM_SHUFFLE(0, 3, 1, 1));
+    // [-t_x, -t_y, -t_x, -t_y]
+    t0 = _mm256_xor_pd(t0, _mm256_set1_pd(-0.0));
+    // [-t_x*x_x, -t_y*x_y, -t_x*y_x, -t_y*y_y]
+    t0 = _mm256_mul_pd(t0, xy);
+    // [-t_y*x_y, -t_x*x_x, -t_y*y_y, -t_x*y_x]
+    t1 = _mm256_shuffle_pd(t0, t0, 0b0101);
+    // [dot(-t, x), dot(-t, x), dot(-t, y), dot(-t, y)]
+    t1 = _mm256_add_pd(t0, t1);
+    // [dot(-t, x), 0, dot(-t, y), 0]
+    t1 = _mm256_shuffle_pd(t1, _mm256_setzero_pd(), 0b0000);
+
+    return Matrix3x3{std::array<Vector, 3>{
+        Vector{_mm256_permute2f128_pd(xy, t1, _MM_SHUFFLE(0, 2, 0, 0))},
+        Vector{_mm256_permute2f128_pd(xy, t1, _MM_SHUFFLE(0, 3, 0, 1))},
+        mat.m_value[2]}};
+#else
+    // [t_x, t_y]
+    __m128d tmp = _mm_shuffle_pd(mat.m_value[0].m_value[1],
+                                 mat.m_value[1].m_value[1], _MM_SHUFFLE2(0, 0));
+    // [-t_x, -t_y]
+    tmp = _mm_xor_pd(tmp, _mm_set_pd1(-0.0));
+
+    // [-t_x*x_x, -t_x*y_x]
+    __m128d t1 = _mm_mul_pd(_mm_shuffle_pd(tmp, tmp, _MM_SHUFFLE2(0, 0)),
+                            mat.m_value[0].m_value[0]);
+    // [-t_y*x_y, -t_y*y_y]
+    __m128d t2 = _mm_mul_pd(_mm_shuffle_pd(tmp, tmp, _MM_SHUFFLE2(1, 1)),
+                            mat.m_value[1].m_value[0]);
+    // [dot(-t, x), dot(-t, y)]
+    tmp = _mm_add_pd(t1, t2);
+
+    // [dot(-t, x), 0]
+    t1 = _mm_shuffle_pd(tmp, _mm_setzero_pd(), _MM_SHUFFLE2(0, 0));
+    // [dot(-t, y), 0]
+    t2 = _mm_shuffle_pd(tmp, _mm_setzero_pd(), _MM_SHUFFLE2(0, 1));
+
+    // [x_x, x_y]
+    __m128d row0 =
+        _mm_shuffle_pd(mat.m_value[0].m_value[0], mat.m_value[1].m_value[0],
+                       _MM_SHUFFLE2(0, 0));
+    // [y_x, y_y]
+    __m128d row1 =
+        _mm_shuffle_pd(mat.m_value[0].m_value[0], mat.m_value[1].m_value[0],
+                       _MM_SHUFFLE2(1, 1));
+
+    return Matrix3x3{std::array<Vector, 3>{Vector{{row0, t1}},
+                                           Vector{{row1, t2}}, mat.m_value[2]}};
+#endif  // AVX INTRINSICS
+#else
+    // [x_x, y_x, x_y, y_y]
+    __m128 xy = _mm_shuffle_ps(mat.m_value[0].m_value, mat.m_value[1].m_value,
+                               _MM_SHUFFLE(1, 0, 1, 0));
+    // [t_x, t_x, t_y, t_y]
+    __m128 t = _mm_shuffle_ps(mat.m_value[0].m_value, mat.m_value[1].m_value,
+                              _MM_SHUFFLE(2, 2, 2, 2));
+    // [-t_x, -t_x, -t_y, -t_y]
+    t = _mm_xor_ps(t, _mm_set_ps1(-0.0f));
+
+    // [-t_x*x_x, -t_x*y_x, -t_y*x_y, -t_y*y_y]
+    t = _mm_mul_ps(t, xy);
+    // [-t_y*x_y, -t_y*y_y, -t_x*x_x, -t_x*y_x]
+    __m128 t_inv = _mm_shuffle_ps(t, t, _MM_SHUFFLE(1, 0, 3, 2));
+    // [dot(-t, x), dot(-t, y), dot(-t, x), dot(-t, y)]
+    t = _mm_add_ps(t, t_inv);
+    // [dot(-t, x), dot(-t, y), 0, 0]
+    t = _mm_movelh_ps(t, _mm_setzero_ps());
+
+    return Matrix3x3{std::array<Vector, 3>{
+        Vector{_mm_shuffle_ps(xy, t, _MM_SHUFFLE(3, 0, 2, 0))},
+        Vector{_mm_shuffle_ps(xy, t, _MM_SHUFFLE(3, 1, 3, 1))},
+        mat.m_value[2]}};
+#endif  // USE_DOUBLE
+#else
+    Vector x_axis{mat.m_value[0][0], mat.m_value[1][0]};
+    Vector y_axis{mat.m_value[0][1], mat.m_value[1][1]};
+    Vector minus_t{-mat.m_value[0][2], -mat.m_value[1][2]};
+    minus_t =
+        Vector{Vector::dot(minus_t, x_axis), Vector::dot(minus_t, y_axis), 1.0};
+    x_axis.setZ(minus_t.getX());
+    y_axis.setZ(minus_t.getY());
+    return Matrix3x3{std::array<Vector, 3>{x_axis, y_axis, mat.m_value[2]}};
 #endif  // USE_INTRINSICS
   }
 
