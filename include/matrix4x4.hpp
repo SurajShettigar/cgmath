@@ -5,14 +5,13 @@
 #define CGMATH_MATRIX4X4_HPP
 
 #include "constants.hpp"
-#include "internal/matrix.hpp"
+#include "internal/matrix4x4.hpp"
 
 namespace cgmath {
 
 class Matrix4x4 {
-
  private:
-    internal::Matrix m_value {};
+  internal::Matrix4x4 m_value{};
 };
-}
+}  // namespace cgmath
 #endif  // CGMATH_MATRIX4X4_HPP

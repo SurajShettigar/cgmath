@@ -11,12 +11,13 @@ namespace cgmath::internal {
 
 class Matrix2x2;
 class Matrix3x3;
-class Matrix;
+class Matrix4x4;
 
 class Vector {
   friend class Matrix2x2;
   friend class Matrix3x3;
-  friend class Matrix;
+  friend class Matrix4x4;
+
  public:
   // Constructors / Destructors
   /// Construct a 0 initialized 4D vector.
@@ -544,7 +545,9 @@ class Vector {
     return *this;
   }
 
-  inline Vector &operator/=(FLOAT rhs) { return *this *= static_cast<float>(1.0) / rhs; }
+  inline Vector &operator/=(FLOAT rhs) {
+    return *this *= static_cast<float>(1.0) / rhs;
+  }
 
   friend inline std::ostream &operator<<(std::ostream &out, const Vector &vec) {
     return out << static_cast<std::string>(vec);
@@ -743,14 +746,14 @@ class Vector {
 /**<---USE_INTRINSICS BEGIN--->**/
 #if USE_DOUBLE
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
-  __m256d m_value;
+  __m256d m_value{};
   explicit Vector(__m256d value) : m_value{value} {};
 #else
-  std::array<__m128d, 2> m_value;
+  std::array<__m128d, 2> m_value{};
   explicit Vector(const std::array<__m128d, 2> &value) : m_value{value} {};
 #endif
 #else
-  __m128 m_value;
+  __m128 m_value{};
   explicit Vector(__m128 value) : m_value{value} {};
 #endif
 /**<---USE_INTRINSICS END--->**/

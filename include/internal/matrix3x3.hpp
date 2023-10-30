@@ -410,10 +410,7 @@ class Matrix3x3 {
   /// Returns the inverse of the given 3x3 matrix, if it exists.
   /// Otherwise returns the original matrix as is.
   static inline Matrix3x3 inverse(const Matrix3x3 &matrix) {
-    FLOAT determinant = matrix.determinant();
-    if (approxEqual(determinant, 0.0)) return matrix;
-    determinant = static_cast<FLOAT>(1.0) / determinant;
-
+    const FLOAT r_det = static_cast<FLOAT>(1.0) / matrix.determinant();
     Matrix3x3 adj{};
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
@@ -583,7 +580,7 @@ class Matrix3x3 {
         Vector{matrix[0][0], matrix[0][1], matrix[1][0], matrix[1][1]});
 #endif  // USE_INTRINSICS
 
-    return determinant * adj;
+    return r_det * adj;
   }
 
   /**
