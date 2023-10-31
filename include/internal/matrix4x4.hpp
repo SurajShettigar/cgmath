@@ -359,61 +359,80 @@ class Matrix4x4 {
   }
 
   friend inline Vector operator*(const Matrix4x4 &lhs, const Vector &rhs) {
-    return Vector{
-        Vector::dot(lhs.getRow(0), rhs), Vector::dot(lhs.getRow(1), rhs),
-        Vector::dot(lhs.getRow(2), rhs), Vector::dot(lhs.getRow(3), rhs)};
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4  matrix-vector mulitplication for AVX512.
+#else
+    // Matrix block multiplication method.
+    // Refer:
+    // https://en.wikipedia.org/wiki/Block_matrix#Block_matrix_multiplication
+    // | A  B |  | X |  ==> | AX + BY |
+    // | C  D |  | Y |      | CX + DY |
+    //  Where,
+    // X = | vec_x 0 |  and Y = | vec_z 0 |
+    //     | vec_y 0 |          | vec_t 0 |
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+    __m256d zero = _mm256_setzero_pd();
+    __m256d mat_x =
+        _mm256_shuffle_pd(rhs.m_value, zero, _MM_SHUFFLE(3, 2, 1, 0));
+    // [z, t, 0, 0]
+    __m256d mat_y =
+        _mm256_permute2f128_pd(rhs.m_value, zero, _MM_SHUFFLE(0, 2, 0, 1));
+    mat_y = _mm256_permute4x64_pd(mat_y, _MM_SHUFFLE(3, 1, 2, 0));
+    Matrix2x2 X{Vector{mat_x}};
+    Matrix2x2 Y{Vector{mat_y}};
+#else
+    __m128d zero = _mm_setzero_pd();
+    __m128d mat_x0 = _mm_shuffle_pd(rhs.m_value[0], zero, _MM_SHUFFLE2(1, 0));
+    __m128d mat_x1 = _mm_shuffle_pd(rhs.m_value[0], zero, _MM_SHUFFLE2(1, 1));
+    __m128d mat_y0 = _mm_shuffle_pd(rhs.m_value[1], zero, _MM_SHUFFLE2(1, 0));
+    __m128d mat_y1 = _mm_shuffle_pd(rhs.m_value[1], zero, _MM_SHUFFLE2(1, 1));
+    Matrix2x2 X{Vector{mat_x0, mat_x1}};
+    Matrix2x2 Y{Vector{mat_y0, mat_y1}};
+#endif  // AVX INTRINSICS
+#else
+    __m128 zero = _mm_setzero_ps();
+    __m128 mat_x = _mm_shuffle_ps(rhs.m_value, zero, _MM_SHUFFLE(1, 0, 1, 0));
+    mat_x = _mm_shuffle_ps(mat_x, mat_x, _MM_SHUFFLE(3, 1, 2, 0));
+    __m128 mat_y = _mm_shuffle_ps(rhs.m_value, zero, _MM_SHUFFLE(1, 0, 3, 2));
+    mat_y = _mm_shuffle_ps(mat_y, mat_y, _MM_SHUFFLE(3, 1, 2, 0));
+    Matrix2x2 X{Vector{mat_x}};
+    Matrix2x2 Y{Vector{mat_y}};
+#endif  // USE_DOUBLE
+#else
+    Matrix2x2 X{Vector{rhs[0], 0.0, rhs[1], 0.0}};
+    Matrix2x2 Y{Vector{rhs[2], 0.0, rhs[3], 0.0}};
+#endif  // USE_INTRINSICS
+    Matrix2x2 res_x = lhs.m_value[0] * X + lhs.m_value[1] * Y;
+    Matrix2x2 res_y = lhs.m_value[2] * X + lhs.m_value[3] * Y;
+    return Vector{res_x.m_value[0], res_x.m_value[2], res_y.m_value[0],
+                  res_y.m_value[2]};
+#endif
   }
 
   // Functions
-  /*[[nodiscard]] inline FLOAT determinant() const {
-    // | 00    01    02    03 |
-    // | 10    11    12    13 |
-    // | 20    21    22    23 |
-    // | 30    31    32    33 |
-    // Determinant =
-    //    00*11*22*33 + 00*12*23*31 + 00*13*21*32
-    //  - 00*13*22*31 - 00*12*21*33 - 00*11*23*32
-    //  - 01*10*22*33 - 02*10*23*31 - 03*10*21*32
-    //  + 03*10*22*31 + 02*10*21*33 + 01*10*23*32
-    //  + 01*12*20*33 + 02*13*20*31 + 03*11*20*32
-    //  - 03*12*20*31 - 02*11*20*33 - 01*13*20*32
-    //  - 01*12*23*30 - 02*13*21*30 - 03*11*22*30
-    //  + 03*12*21*30 + 02*11*23*30 + 01*13*22*30
 
-    return m_value[0][0] * m_value[1][1] * m_value[2][2] * m_value[3][3] +
-           m_value[0][0] * m_value[1][2] * m_value[2][3] * m_value[3][1] +
-           m_value[0][0] * m_value[1][3] * m_value[2][1] * m_value[3][2] -
-
-           m_value[0][0] * m_value[1][3] * m_value[2][2] * m_value[3][1] -
-           m_value[0][0] * m_value[1][2] * m_value[2][1] * m_value[3][3] -
-           m_value[0][0] * m_value[1][1] * m_value[2][3] * m_value[3][2] -
-
-           m_value[0][1] * m_value[1][0] * m_value[2][2] * m_value[3][3] -
-           m_value[0][2] * m_value[1][0] * m_value[2][3] * m_value[3][1] -
-           m_value[0][3] * m_value[1][0] * m_value[2][1] * m_value[3][2] +
-
-           m_value[0][3] * m_value[1][0] * m_value[2][2] * m_value[3][1] +
-           m_value[0][2] * m_value[1][0] * m_value[2][1] * m_value[3][3] +
-           m_value[0][1] * m_value[1][0] * m_value[2][3] * m_value[3][2] +
-
-           m_value[0][1] * m_value[1][2] * m_value[2][0] * m_value[3][3] +
-           m_value[0][2] * m_value[1][3] * m_value[2][0] * m_value[3][1] +
-           m_value[0][3] * m_value[1][1] * m_value[2][0] * m_value[3][2] -
-
-           m_value[0][3] * m_value[1][2] * m_value[2][0] * m_value[3][1] -
-           m_value[0][2] * m_value[1][1] * m_value[2][0] * m_value[3][3] -
-           m_value[0][1] * m_value[1][3] * m_value[2][0] * m_value[3][2] -
-
-           m_value[0][1] * m_value[1][2] * m_value[2][3] * m_value[3][0] -
-           m_value[0][2] * m_value[1][3] * m_value[2][1] * m_value[3][0] -
-           m_value[0][3] * m_value[1][1] * m_value[2][2] * m_value[3][0] +
-
-           m_value[0][3] * m_value[1][2] * m_value[2][1] * m_value[3][0] +
-           m_value[0][2] * m_value[1][1] * m_value[2][3] * m_value[3][0] +
-           m_value[0][1] * m_value[1][3] * m_value[2][2] * m_value[3][0];
-  }*/
-
+  static inline Matrix4x4 transpose(const Matrix4x4 &matrix) {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4  transpose for AVX512.
+#else
+    // Block matrix transpose method
+    // Refer:
+    // https://en.wikipedia.org/wiki/Block_matrix#Block_transpose
+    // | A  B |  ==> | T(A) T(C) |
+    // | C  D |      | T(B) T(D) |
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2::transpose(matrix.m_value[0]),
+                                 Matrix2x2::transpose(matrix.m_value[2]),
+                                 Matrix2x2::transpose(matrix.m_value[1]),
+                                 Matrix2x2::transpose(matrix.m_value[3])}};
+#endif
+  }
   [[nodiscard]] inline FLOAT determinant() const {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4  determinant for AVX512.
+#else
     // Block matrix determinant method
     // Refer:
     // https://en.wikipedia.org/wiki/Block_matrix#Block_matrix_determinant
@@ -424,116 +443,13 @@ class Matrix4x4 {
     // Determinant = Determinant(A)*Determinant(D- C*Inverse(A)*B);
     //             = Determinant(AD - BC)
     return (m_value[0] * m_value[3] - m_value[1] * m_value[2]).determinant();
-  }
-
-  static inline Matrix4x4 transpose(const Matrix4x4 &matrix) {
-#ifdef USE_INTRINSICS
-#ifdef USE_DOUBLE
-#if defined(__AVX512F__)
-    // TODO: Transpose AVX512 matrix.
-    return matrix;
-#elif defined(__AVX2__) || defined(__AVX__)
-    // x_x, y_x, x_y, y_y
-    __m256d row1 = _mm256_permute2f128_pd(matrix.m_value[0].m_value,
-                                          matrix.m_value[1].m_value,
-                                          _MM_SHUFFLE(1, 0, 1, 0));
-    // x_x, x_y, y_x, y_y
-    row1 = _mm256_permute4x64_pd(row1, _MM_SHUFFLE(3, 1, 2, 0));
-
-    // z_x, t_x, z_y, t_y
-    __m256d row2 = _mm256_permute2f128_pd(matrix.m_value[0].m_value,
-                                          matrix.m_value[1].m_value,
-                                          _MM_SHUFFLE(3, 2, 3, 2));
-    // z_x, z_y, t_x, t_y
-    row2 = _mm256_permute4x64_pd(row2, _MM_SHUFFLE(3, 1, 2, 0));
-
-    // x_z, y_z, x_w, y_w
-    __m256d row3 = _mm256_permute2f128_pd(matrix.m_value[2].m_value,
-                                          matrix.m_value[3].m_value,
-                                          _MM_SHUFFLE(1, 0, 1, 0));
-    // x_z, x_w, y_z, y_w
-    row3 = _mm256_permute4x64_pd(row3, _MM_SHUFFLE(3, 1, 2, 0));
-
-    // z_z, t_z, z_w, t_w
-    __m256d row4 = _mm256_permute2f128_pd(matrix.m_value[2].m_value,
-                                          matrix.m_value[3].m_value,
-                                          _MM_SHUFFLE(3, 2, 3, 2));
-    // z_z, z_w, t_z, t_w
-    row4 = _mm256_permute4x64_pd(row4, _MM_SHUFFLE(3, 1, 2, 0));
-
-    return Matrix4x4{
-        // x_x, x_y, x_z, x_w
-        Vector{_mm256_permute2f128_pd(row1, row3, _MM_SHUFFLE(1, 0, 1, 0))},
-        // y_x, y_y, y_z, y_w
-        Vector{_mm256_permute2f128_pd(row1, row3, _MM_SHUFFLE(3, 2, 3, 2))},
-        // z_x, z_y, z_z, z_w
-        Vector{_mm256_permute2f128_pd(row2, row4, _MM_SHUFFLE(1, 0, 1, 0))},
-        // t_x, t_y, t_z, t_w
-        Vector{_mm256_permute2f128_pd(row2, row4, _MM_SHUFFLE(3, 2, 3, 2))}};
-#else
-    // x_x, x_y
-    __m128d row11 = _mm_shuffle_pd(matrix.m_value[0].m_value[0],
-                                   matrix.m_value[1].m_value[0], 0b00);
-    // x_z, x_w
-    __m128d row12 = _mm_shuffle_pd(matrix.m_value[2].m_value[0],
-                                   matrix.m_value[3].m_value[0], 0b00);
-    // y_x, y_y
-    __m128d row21 = _mm_shuffle_pd(matrix.m_value[0].m_value[0],
-                                   matrix.m_value[1].m_value[0], 0b11);
-    // y_z, y_w
-    __m128d row22 = _mm_shuffle_pd(matrix.m_value[2].m_value[0],
-                                   matrix.m_value[3].m_value[0], 0b11);
-    // z_x, z_y
-    __m128d row31 = _mm_shuffle_pd(matrix.m_value[0].m_value[1],
-                                   matrix.m_value[1].m_value[1], 0b00);
-    // z_z, z_w
-    __m128d row32 = _mm_shuffle_pd(matrix.m_value[2].m_value[1],
-                                   matrix.m_value[3].m_value[1], 0b00);
-    // t_x, t_y
-    __m128d row41 = _mm_shuffle_pd(matrix.m_value[0].m_value[1],
-                                   matrix.m_value[1].m_value[1], 0b11);
-    // t_z, t_w
-    __m128d row42 = _mm_shuffle_pd(matrix.m_value[2].m_value[1],
-                                   matrix.m_value[3].m_value[1], 0b11);
-
-    return Matrix4x4{Vector{{row11, row12}}, Vector{{row21, row22}},
-                     Vector{{row31, row32}}, Vector{{row41, row42}}};
-#endif  // AVX INTRINSICS
-#else
-    // x_x, y_x, x_y, y_y
-    __m128 row1 =
-        _mm_shuffle_ps(matrix.m_value[0].m_value, matrix.m_value[1].m_value,
-                       _MM_SHUFFLE(1, 0, 1, 0));
-    // z_x, t_x, z_y, t_y
-    __m128 row2 =
-        _mm_shuffle_ps(matrix.m_value[0].m_value, matrix.m_value[1].m_value,
-                       _MM_SHUFFLE(3, 2, 3, 2));
-    // x_z, y_z, x_w, y_w
-    __m128 row3 =
-        _mm_shuffle_ps(matrix.m_value[2].m_value, matrix.m_value[3].m_value,
-                       _MM_SHUFFLE(1, 0, 1, 0));
-    // z_z, t_z, z_w, t_w
-    __m128 row4 =
-        _mm_shuffle_ps(matrix.m_value[2].m_value, matrix.m_value[3].m_value,
-                       _MM_SHUFFLE(3, 2, 3, 2));
-
-    return Matrix4x4{
-        // x_x, x_y, x_z, x_w
-        Vector{_mm_shuffle_ps(row1, row3, _MM_SHUFFLE(2, 0, 2, 0))},
-        // y_x, y_y, y_z, y_w
-        Vector{_mm_shuffle_ps(row1, row3, _MM_SHUFFLE(3, 1, 3, 1))},
-        // z_x, z_y, z_z, z_w
-        Vector{_mm_shuffle_ps(row2, row4, _MM_SHUFFLE(2, 0, 2, 0))},
-        // t_x, t_y, t_z, t_w
-        Vector{_mm_shuffle_ps(row2, row4, _MM_SHUFFLE(3, 1, 3, 1))}};
-#endif  // USE_DOUBLE
-#else
-    return Matrix4x4{matrix.getRow(0), matrix.getRow(1), matrix.getRow(2),
-                     matrix.getRow(3)};
-#endif  // USE_INTRINSICS
+#endif
   }
 
   static inline Matrix4x4 inverse(const Matrix4x4 &matrix) {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4  inverse for AVX512.
+#else
     // Block matrix method
     // Refer: https://en.wikipedia.org/wiki/Block_matrix#Block_matrix_inversion
     // | a    b    c    d |     | A   B |
@@ -548,8 +464,34 @@ class Matrix4x4 {
     // Y = 1 / Det(matrix) * Adj(Det(B)*C - D*Adj(Adj(A)*B))
     // Z = 1 / Det(matrix) * Adj(Det(C)*B - A*Adj(Adj(D)*C))
     // W = 1 / Det(matrix) * Adj(Det(A)*D - C*(Adj(A)*B))
+    const FLOAT r_det = static_cast<FLOAT>(1.0) / matrix.determinant();
 
-    return matrix;
+    const Matrix2x2 X =
+        r_det * Matrix2x2::adjoint(
+                    matrix.m_value[3].determinant() * matrix.m_value[0] -
+                    matrix.m_value[1] * Matrix2x2::adjoint(matrix.m_value[3]) *
+                        matrix.m_value[2]);
+    const Matrix2x2 Y =
+        r_det *
+        Matrix2x2::adjoint(
+            matrix.m_value[1].determinant() * matrix.m_value[2] -
+            matrix.m_value[3] *
+                Matrix2x2::adjoint(Matrix2x2::adjoint(matrix.m_value[0]) *
+                                   matrix.m_value[1]));
+    const Matrix2x2 Z =
+        r_det *
+        Matrix2x2::adjoint(
+            matrix.m_value[2].determinant() * matrix.m_value[1] -
+            matrix.m_value[0] *
+                Matrix2x2::adjoint(Matrix2x2::adjoint(matrix.m_value[3]) *
+                                   matrix.m_value[2]));
+    const Matrix2x2 W =
+        r_det * Matrix2x2::adjoint(
+                    matrix.m_value[0].determinant() * matrix.m_value[3] -
+                    matrix.m_value[2] * Matrix2x2::adjoint(matrix.m_value[0]) *
+                        matrix.m_value[1]);
+    return Matrix4x4{std::array<Matrix2x2, 4>{X, Y, Z, W}};
+#endif
   }
 
  private:
@@ -567,70 +509,6 @@ class Matrix4x4 {
       Matrix2x2{0.0, 0.0, 0.0, 0.0}, Matrix2x2{1.0, 0.0, 0.0, 1.0}};
   explicit Matrix4x4(const std::array<Matrix2x2, 4> &value) : m_value{value} {};
 #endif
-
-  /*static inline std::array<Matrix2x2, 4> getMatrixBlocks(
-      const Matrix4x4 &matrix) {
-#ifdef USE_INTRINSICS
-#ifdef USE_DOUBLE
-#if defined(__AVX512F__)
-    // TODO: Matrix4x4 blocks for AVX512 double-precision.
-#elif defined(__AVX2__) || defined(__AVX__)
-    const Matrix2x2 a{Vector{
-        _mm256_set_m128d(_mm256_castpd256_pd128(matrix.m_value[0].m_value),
-                         _mm256_castpd256_pd128(matrix.m_value[1].m_value))}};
-    const Matrix2x2 b{Vector{_mm256_set_m128d(
-        _mm256_extractf128_pd(matrix.m_value[0].m_value, 0b1),
-        _mm256_extractf128_pd(matrix.m_value[1].m_value, 0b1))}};
-    const Matrix2x2 c{Vector{
-        _mm256_set_m128d(_mm256_castpd256_pd128(matrix.m_value[2].m_value),
-                         _mm256_castpd256_pd128(matrix.m_value[3].m_value))}};
-    const Matrix2x2 d{Vector{_mm256_set_m128d(
-        _mm256_extractf128_pd(matrix.m_value[2].m_value, 0b1),
-        _mm256_extractf128_pd(matrix.m_value[3].m_value, 0b1))}};
-#else
-    const Matrix2x2 a{
-        Vector{{matrix.m_value[0].m_value[0], matrix.m_value[1].m_value[0]}}};
-    const Matrix2x2 b{
-        Vector{{matrix.m_value[0].m_value[1], matrix.m_value[1].m_value[1]}}};
-    const Matrix2x2 c{
-        Vector{{matrix.m_value[2].m_value[0], matrix.m_value[3].m_value[0]}}};
-    const Matrix2x2 d{
-        Vector{{matrix.m_value[2].m_value[1], matrix.m_value[3].m_value[1]}}};
-#endif  // AVX INTRINSICS
-#else
-#if defined(__AVX512F__)
-    // TODO: Matrix4x4 blocks for AVX512 single-precision.
-#else
-    __m128 mat_a =
-        _mm_shuffle_ps(matrix.m_value[0].m_value, matrix.m_value[1].m_value,
-                       _MM_SHUFFLE(1, 0, 1, 0));
-    __m128 mat_b =
-        _mm_shuffle_ps(matrix.m_value[0].m_value, matrix.m_value[1].m_value,
-                       _MM_SHUFFLE(3, 2, 3, 2));
-    __m128 mat_c =
-        _mm_shuffle_ps(matrix.m_value[2].m_value, matrix.m_value[3].m_value,
-                       _MM_SHUFFLE(1, 0, 1, 0));
-    __m128 mat_d =
-        _mm_shuffle_ps(matrix.m_value[2].m_value, matrix.m_value[3].m_value,
-                       _MM_SHUFFLE(3, 2, 3, 2));
-    const Matrix2x2 a{Vector{mat_a}};
-    const Matrix2x2 b{Vector{mat_b}};
-    const Matrix2x2 c{Vector{mat_c}};
-    const Matrix2x2 d{Vector{mat_d}};
-#endif  // AVX INTRINSICS FLOAT
-#endif  // USE_DOUBLE
-#else
-    const Matrix2x2 a{Vector{matrix.m_value[0][0], matrix.m_value[0][1],
-                             matrix.m_value[1][0], matrix.m_value[1][1]}};
-    const Matrix2x2 b{Vector{matrix.m_value[0][2], matrix.m_value[0][3],
-                             matrix.m_value[1][2], matrix.m_value[1][3]}};
-    const Matrix2x2 c{Vector{matrix.m_value[2][0], matrix.m_value[2][1],
-                             matrix.m_value[3][0], matrix.m_value[3][1]}};
-    const Matrix2x2 d{Vector{matrix.m_value[2][2], matrix.m_value[2][3],
-                             matrix.m_value[3][2], matrix.m_value[3][3]}};
-#endif  // USE_INTRINSICS
-    return std::array<Matrix2x2, 4>{a, b, c, d};
-  }*/
 };
 
 }  // namespace cgmath::internal

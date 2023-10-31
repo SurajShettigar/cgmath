@@ -193,13 +193,12 @@ class Matrix2x2 {
                 _mm_add_pd(m_value.m_value[1], rhs.m_value.m_value[1])}}};
 #endif  // AVX INTRINSICS
 #else
-    return Matrix2x2{
-        Vector{_mm_add_ps(m_value.m_value, rhs.m_value.m_value)}};
+    return Matrix2x2{Vector{_mm_add_ps(m_value.m_value, rhs.m_value.m_value)}};
 #endif  // USE_DOUBLE
 #else
-    return Matrix2x2{Vector{
-        m_value[0] + rhs.m_value[0], m_value[1] + rhs.m_value[1],
-        m_value[2] + rhs.m_value[2], m_value[3] + rhs.m_value[3]}};
+    return Matrix2x2{
+        Vector{m_value[0] + rhs.m_value[0], m_value[1] + rhs.m_value[1],
+               m_value[2] + rhs.m_value[2], m_value[3] + rhs.m_value[3]}};
 #endif  // USE_INTRINSICS
   }
 
@@ -216,13 +215,12 @@ class Matrix2x2 {
                 _mm_sub_pd(m_value.m_value[1], rhs.m_value.m_value[1])}}};
 #endif  // AVX INTRINSICS
 #else
-    return Matrix2x2{
-        Vector{_mm_sub_ps(m_value.m_value, rhs.m_value.m_value)}};
+    return Matrix2x2{Vector{_mm_sub_ps(m_value.m_value, rhs.m_value.m_value)}};
 #endif  // USE_DOUBLE
 #else
-    return Matrix2x2{Vector{
-        m_value[0] - rhs.m_value[0], m_value[1] - rhs.m_value[1],
-        m_value[2] - rhs.m_value[2], m_value[3] - rhs.m_value[3]}};
+    return Matrix2x2{
+        Vector{m_value[0] - rhs.m_value[0], m_value[1] - rhs.m_value[1],
+               m_value[2] - rhs.m_value[2], m_value[3] - rhs.m_value[3]}};
 #endif  // USE_INTRINSICS
   }
 
@@ -273,6 +271,31 @@ class Matrix2x2 {
   }
 
   // Functions
+  /// Transposes the given 2x2 matrix.
+  static inline Matrix2x2 transpose(const Matrix2x2 &matrix) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    return Matrix2x2{Vector{_mm256_permute4x64_pd(matrix.m_value.m_value,
+                                                  _MM_SHUFFLE(3, 1, 2, 0))}};
+#else
+    return Matrix2x2{Vector{
+        {_mm_shuffle_pd(matrix.m_value.m_value[0], matrix.m_value.m_value[1],
+                        _MM_SHUFFLE2(0, 0)),
+         _mm_shuffle_pd(matrix.m_value.m_value[0], matrix.m_value.m_value[1],
+                        _MM_SHUFFLE2(1, 1))}}};
+#endif  // AVX INTRINSICS
+#else
+    return Matrix2x2{
+        Vector{_mm_shuffle_ps(matrix.m_value.m_value, matrix.m_value.m_value,
+                              _MM_SHUFFLE(3, 1, 2, 0))}};
+#endif  // USE_DOUBLE
+#else
+    return Matrix2x2{matrix.m_value[0], matrix.m_value[1], matrix.m_value[2],
+                     matrix.m_value[3]};
+#endif  // USE_INTRINSICS
+  }
+
   /// Returns the determinant of the 2x2 matrix.
   [[nodiscard]] inline FLOAT determinant() const {
 #ifdef USE_INTRINSICS
@@ -299,34 +322,7 @@ class Matrix2x2 {
 #endif  // USE_INTRINSICS
   }
 
-  /// Transposes the given 2x2 matrix.
-  static inline Matrix2x2 transpose(const Matrix2x2 &matrix) {
-#ifdef USE_INTRINSICS
-#ifdef USE_DOUBLE
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
-    return Matrix2x2{Vector{_mm256_permute4x64_pd(matrix.m_value.m_value,
-                                                  _MM_SHUFFLE(3, 1, 2, 0))}};
-#else
-    return Matrix2x2{Vector{
-        {_mm_shuffle_pd(matrix.m_value.m_value[0], matrix.m_value.m_value[1],
-                        _MM_SHUFFLE2(0, 0)),
-         _mm_shuffle_pd(matrix.m_value.m_value[0], matrix.m_value.m_value[1],
-                        _MM_SHUFFLE2(1, 1))}}};
-#endif  // AVX INTRINSICS
-#else
-    return Matrix2x2{
-        Vector{_mm_shuffle_ps(matrix.m_value.m_value, matrix.m_value.m_value,
-                              _MM_SHUFFLE(3, 1, 2, 0))}};
-#endif  // USE_DOUBLE
-#else
-    return Matrix2x2{matrix.m_value[0], matrix.m_value[1], matrix.m_value[2],
-                     matrix.m_value[3]};
-#endif  // USE_INTRINSICS
-  }
-
-  /// Returns the inverse of the given 2x2 matrix.
-  static inline Matrix2x2 inverse(const Matrix2x2 &matrix) {
-    const FLOAT r_det = static_cast<FLOAT>(1.0) / matrix.determinant();
+  static inline Matrix2x2 adjoint(const Matrix2x2 &matrix) {
     Vector adj = matrix.m_value;
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
@@ -360,11 +356,16 @@ class Matrix2x2 {
     adj.setZ(-adj[2]);
     adj.setW(tmp);
 #endif  // USE_INTRINSICS
-    return Matrix2x2(r_det * adj);
+    return Matrix2x2{adj};
+  }
+
+  /// Returns the inverse of the given 2x2 matrix.
+  static inline Matrix2x2 inverse(const Matrix2x2 &matrix) {
+    return (static_cast<FLOAT>(1.0) / matrix.determinant()) * adjoint(matrix);
   }
 
  private:
-  Vector m_value {};
+  Vector m_value{};
 
   /// Construct a 2x2 matrix a 4D vector which has matrix values in the
   /// memory layout order. i.e [x_x, y_x, x_y, y_y].
@@ -372,4 +373,4 @@ class Matrix2x2 {
 };
 }  // namespace cgmath::internal
 
-#endif  // CGMATH_MATRIX2X2_HPP
+#endif  // CGMATH_INTERNAL_MATRIX2X2_HPP
