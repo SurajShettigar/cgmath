@@ -210,7 +210,7 @@ class Vector3 {
    * @return Angle in degrees between two 3D vectors.
    */
   static inline FLOAT angle(const Vector3 &lhs, const Vector3 &rhs) {
-    return degree(acos(dot(lhs, rhs) / (lhs.length() * rhs.length())));
+    return degree(std::acos(dot(lhs, rhs) / (lhs.length() * rhs.length())));
   }
 
   /**

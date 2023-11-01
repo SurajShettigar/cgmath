@@ -163,16 +163,17 @@ TEST_F(VectorTest, Vector2FunctionsDotProduct) {
 TEST_F(VectorTest, Vector2FunctionsAngle) {
   Vector2 vec1 = Vector2{1.0, 0.0};
   Vector2 vec2 = Vector2{0.0, 1.0};
-  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), PI / 2.0);
+  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 90.0);
   vec1 = Vector2{1.0, 0.0};
   vec2 = Vector2{-1.0, 0.0};
-  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), PI);
+  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 180.0);
   vec1 = Vector2{1.0, 0.0};
   vec2 = Vector2{1.0, 0.001};
+
 #ifdef USE_DOUBLE
-  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 0.00099999966670310538);
+  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 0.057295760416576934);
 #else
-  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 0.0009765625);
+  ASSERT_EQ_FLT(Vector2::angle(vec1, vec2), 0.05595291);
 #endif
 }
 
@@ -344,16 +345,17 @@ TEST_F(VectorTest, Vector3FunctionsDotProduct) {
 TEST_F(VectorTest, Vector3FunctionsAngle) {
   Vector3 vec1 = Vector3{1.0, 0.0, 0.0};
   Vector3 vec2 = Vector3{0.0, 1.0, 0.0};
-  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), PI / 2.0);
+  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 90.0);
   vec1 = Vector3{1.0, 0.0, 0.0};
   vec2 = Vector3{-1.0, 0.0, 0.0};
-  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), PI);
+  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 180.0);
   vec1 = Vector3{1.0, 0.0, 0.0};
   vec2 = Vector3{1.0, 0.001, 0.0};
+
 #ifdef USE_DOUBLE
-  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 0.00099999966670310538);
+  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 0.057295760416576934);
 #else
-  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 0.0009765625);
+  ASSERT_EQ_FLT(Vector3::angle(vec1, vec2), 0.05595291);
 #endif
 }
 
@@ -648,11 +650,10 @@ int main(int argc, char **argv) {
   int testResult = RUN_ALL_TESTS();
 #ifdef BENCHMARK_TEST
   if (testResult == 0) {
-
     benchmark::Initialize(&argc, argv);
 
-    std::string archValue {};
-#ifdef  USE_DOUBE
+    std::string archValue{};
+#ifdef USE_DOUBE
     archValue = "DOUBLE_";
 #else
     archValue = "FLOAT_";
@@ -662,10 +663,10 @@ int main(int argc, char **argv) {
     archValue += "AVX";
 #else
     archValue += "SSE";
-#endif // AVX INTRINSICS
+#endif  // AVX INTRINSICS
 #else
     archValue += "NONE";
-#endif // USE_INTRINSICS
+#endif  // USE_INTRINSICS
 
     benchmark::AddCustomContext("SIMD Architecture", archValue);
     benchmark::RunSpecifiedBenchmarks();

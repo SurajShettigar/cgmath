@@ -13,7 +13,7 @@ class Matrix2x2 {
  public:
   // Constructors / Destructors
   /// Constructs an identity 2x2 matrix.
-  explicit Matrix2x2() = default;
+  explicit Matrix2x2() : m_value{} {};
   /// Constructs a 2x2 matrix with x-axis and y-axis column values.
   explicit Matrix2x2(FLOAT x_x, FLOAT x_y, FLOAT y_x, FLOAT y_y)
       : m_value{x_x, x_y, y_x, y_y} {};
@@ -115,12 +115,12 @@ class Matrix2x2 {
 
   /// Matrix-scalar multiplication.
   friend inline Matrix2x2 operator*(const Matrix2x2 &lhs, FLOAT rhs) {
-    return Matrix2x2 {lhs.m_value * rhs};
+    return Matrix2x2{lhs.m_value * rhs};
   }
 
   /// Matrix-scalar multiplication.
   friend inline Matrix2x2 operator*(FLOAT lhs, const Matrix2x2 &rhs) {
-    return Matrix2x2 {lhs * rhs.m_value};
+    return Matrix2x2{lhs * rhs.m_value};
   }
 
   // Type-Conversions

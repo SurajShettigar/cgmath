@@ -137,7 +137,7 @@ class Vector {
     _mm_store_ps(data, m_value);
 #endif  // USE_DOUBLE
 #else
-    std::memcpy(data, m_value.data(), m_value.size());
+    std::memcpy(data, m_value.data(), m_value.size() * sizeof(FLOAT));
 #endif  // USE_INTRINSICS
   }
 

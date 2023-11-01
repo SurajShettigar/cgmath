@@ -12,9 +12,10 @@
 #include "internal/vector.hpp"
 
 namespace cgmath {
-class Vector2;
 
+class Vector2;
 class Vector3;
+class Matrix4x4;
 
 using Vector = internal::Vector;
 
@@ -22,6 +23,7 @@ using Vector = internal::Vector;
  * 4D Floating-Point Vector
  */
 class Vector4 {
+  friend class Matrix4x4;
  public:
   /// [0.0, 0.0, 0.0, 0.0]
   static const Vector4 ZERO;

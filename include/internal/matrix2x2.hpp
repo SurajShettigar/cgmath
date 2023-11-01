@@ -225,19 +225,146 @@ class Matrix2x2 {
   }
 
   /// Matrix-Matrix multiplication.
-  friend inline Matrix2x2 operator*(const Matrix2x2 &lhs,
-                                    const Matrix2x2 &rhs) {
-    Matrix2x2 temp = Matrix2x2::transpose(rhs);
-    return Matrix2x2{Vector{Vector::dot(lhs.getRow(0), temp.getRow(0)),
-                            Vector::dot(lhs.getRow(0), temp.getRow(1)),
-                            Vector::dot(lhs.getRow(1), temp.getRow(0)),
-                            Vector::dot(lhs.getRow(1), temp.getRow(1))}};
+  inline Matrix2x2 operator*(const Matrix2x2 &rhs) const {
+    // | a  b | x | x  y |
+    // | c  d |   | z  w |
+    // =
+    // | ax + bz  ay + bw |
+    // | cx + dz  cy + dw |
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    // [a, a, c, c]
+    __m256d tmp0 = _mm256_shuffle_pd(m_value.m_value, m_value.m_value, 0b0000);
+    // [x, y, x, y]
+    __m256d tmp1 = _mm256_permute4x64_pd(rhs.m_value.m_value, _MM_SHUFFLE(1, 0, 1, 0));
+    // [ax, ay, cx, cy]
+    __m256d res = _mm256_mul_pd(tmp0, tmp1);
+
+    // [b, b, d, d]
+    tmp0 = _mm256_shuffle_pd(m_value.m_value, m_value.m_value, 0b1111);
+    // [z, w, z, w]
+    tmp1 = _mm256_permute4x64_pd(rhs.m_value.m_value,
+                                 _MM_SHUFFLE(3, 2, 3, 2));
+    //[bz, bw, dz, dw]
+    tmp1 = _mm256_mul_pd(tmp0, tmp1);
+    // [ax + bz, ay + bw, cx + dz, cy + dw]
+    res = _mm256_add_pd(res, tmp1);
+    return Matrix2x2{Vector{res}};
+#else
+    // [a, a]
+    __m128d tmp0 =
+        _mm_shuffle_pd(m_value.m_value[0], m_value.m_value[0], _MM_SHUFFLE2(0, 0));
+    // [c, c]
+    __m128d tmp1 =
+        _mm_shuffle_pd(m_value.m_value[1], m_value.m_value[1], _MM_SHUFFLE2(0, 0));
+    // [ax, ay]
+    __m128d res0 = _mm_mul_pd(tmp0, rhs.m_value.m_value[0]);
+    // [cx, cy]
+    __m128d res1 = _mm_mul_pd(tmp1, rhs.m_value.m_value[0]);
+
+    // [b, b]
+    tmp0 = _mm_shuffle_pd(m_value.m_value[0], m_value.m_value[0], _MM_SHUFFLE2(1, 1));
+    // [d, d]
+    tmp1 = _mm_shuffle_pd(m_value.m_value[1], m_value.m_value[1], _MM_SHUFFLE2(1, 1));
+    // [bz, bw]
+    tmp0 = _mm_mul_pd(tmp0, rhs.m_value.m_value[1]);
+    // [dz, dw]
+    tmp1 = _mm_mul_pd(tmp1, rhs.m_value.m_value[1]);
+
+    // [ax + bz, ay + bw]
+    res0 = _mm_add_pd(res0, tmp0);
+    // [cx + dz, cy + dw]
+    res1 = _mm_add_pd(res1, tmp1);
+
+    return Matrix2x2{Vector{{res0, res1}}};
+#endif  // AVX INTRINSICS
+#else
+    // [a, a, c, c]
+    __m128 tmp0 =
+        _mm_shuffle_ps(m_value.m_value, m_value.m_value, _MM_SHUFFLE(2, 2, 0, 0));
+    // [x, y, x, y]
+    __m128 tmp1 =
+        _mm_shuffle_ps(rhs.m_value.m_value, rhs.m_value.m_value, _MM_SHUFFLE(1, 0, 1, 0));
+    // [ax, ay, cx, cy]
+    __m128 res = _mm_mul_ps(tmp0, tmp1);
+
+    // [b, b, d, d]
+    tmp0 = _mm_shuffle_ps(m_value.m_value, m_value.m_value, _MM_SHUFFLE(3, 3, 1, 1));
+    // [z, w, z, w]
+    tmp1 = _mm_shuffle_ps(rhs.m_value.m_value, rhs.m_value.m_value, _MM_SHUFFLE(3, 2, 3, 2));
+    //[bz, bw, dz, dw]
+    tmp1 = _mm_mul_ps(tmp0, tmp1);
+    // [ax + bz, ay + bw, cx + dz, cy + dw]
+    res = _mm_add_ps(res, tmp1);
+    return Matrix2x2{Vector{res}};
+#endif  // USE_DOUBLE
+#else
+    return Matrix2x2{Vector{
+        lhs.m_value[0] * rhs.m_value[0] + lhs.m_value[1] * rhs.m_value[2],
+        lhs.m_value[0] * rhs.m_value[1] + lhs.m_value[1] * rhs.m_value[3],
+        lhs.m_value[2] * rhs.m_value[0] + lhs.m_value[3] * rhs.m_value[2],
+        lhs.m_value[2] * rhs.m_value[1] + lhs.m_value[3] * rhs.m_value[3]}};
+#endif  // USE_INTRINSICS
   }
 
   /// Matrix-2D Column vector multiplication.
-  friend inline Vector operator*(const Matrix2x2 &lhs, const Vector &rhs) {
-    return Vector{Vector::dot(lhs.getRow(0), rhs),
-                  Vector::dot(lhs.getRow(1), rhs), 0.0, 0.0};
+  inline Vector operator*(const Vector &rhs) const {
+    // | a  b | x | x |
+    // | c  d |   | y |
+    // =
+    // | ax + by |
+    // | cx + dy |
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m128d xy = _mm256_castpd256_pd128(rhs.m_value);
+    // [x, y, x, y]
+    __m256d tmp0 = _mm256_set_m128d(xy, xy);
+    // [ax, by, cx, dy]
+    tmp0 = _mm256_mul_pd(m_value.m_value, tmp0);
+
+    // [by, ax, dy, cx]
+    __m256d tmp1 = _mm256_permute_pd(tmp0, 0b0101);
+    // [ax + by, ax + by, cx + dy, cx + dy]
+    tmp1 = _mm256_add_pd(tmp0, tmp1);
+    // [ax + by, 0.0, cx + dy, 0.0]
+    tmp1 = _mm256_shuffle_pd(tmp1, _mm256_setzero_pd(), 0b0000);
+    // [ax + by, cx + dy, 0.0, 0.0]
+    tmp1 = _mm256_permute4x64_pd(tmp1, _MM_SHUFFLE(3, 1, 2, 0));
+    return Vector{tmp1};
+#else
+    // [ax, by]
+    __m128d tmp0 = _mm_mul_pd(m_value.m_value[0], rhs.m_value[0]);
+    // [cx, dy]
+    __m128d tmp1 = _mm_mul_pd(m_value.m_value[1], rhs.m_value[0]);
+    // [ax, cx]
+    __m128d tmp2 = _mm_shuffle_pd(tmp0, tmp1, 0b00);
+    // [by, dy]
+    tmp1 = _mm_shuffle_pd(tmp0, tmp1, 0b11);
+
+    // [ax + by, cx + dy]
+    tmp2 = _mm_add_pd(tmp2, tmp1);
+    return Vector{{tmp2, _mm_setzero_pd()}};
+#endif  // AVX INTRINSICS
+#else
+    // [x, y, x, y]
+    __m128 tmp0 =
+        _mm_shuffle_ps(rhs.m_value, rhs.m_value, _MM_SHUFFLE(1, 0, 1, 0));
+    // [ax, by, cx, dy]
+    tmp0 = _mm_mul_ps(m_value.m_value, tmp0);
+    // [by, ax, dy, cx]
+    __m128 tmp1 = _mm_shuffle_ps(tmp0, tmp0, _MM_SHUFFLE(2, 3, 0, 1));
+    // [ax + by, ax + by, cx + dy, cx + dy]
+    tmp1 = _mm_add_ps(tmp0, tmp1);
+    // [ax + by, cx + dy, 0.0, 0.0]
+    tmp1 = _mm_shuffle_ps(tmp1, _mm_setzero_ps(), _MM_SHUFFLE(0, 0, 2, 0));
+    return Vector{tmp1};
+#endif  // USE_DOUBLE
+#else
+    return Vector{lhs.m_value[0] * rhs[0] + lhs.m_value[1] * rhs[1],
+                  lhs.m_value[2] * rhs[0] + lhs.m_value[3] * rhs[1], 0.0, 0.0};
+#endif  // USE_INTRINSICS
   }
 
   /// Matrix-scalar multiplication.
@@ -357,6 +484,28 @@ class Matrix2x2 {
     adj.setW(tmp);
 #endif  // USE_INTRINSICS
     return Matrix2x2{adj};
+  }
+
+  static inline FLOAT trace(const Matrix2x2 &matrix) {
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    __m256d tmp =
+        _mm256_permute4x64_pd(matrix.m_value.m_value, _MM_SHUFFLE(0, 2, 1, 3));
+    return _mm256_cvtsd_f64(_mm256_add_pd(matrix.m_value.m_value, tmp));
+#else
+    __m128d tmp = _mm_shuffle_pd(matrix.m_value.m_value[1],
+                                 matrix.m_value.m_value[1], _MM_SHUFFLE2(0, 1));
+    return _mm_cvtsd_f64(_mm_add_pd(matrix.m_value.m_value[0], tmp));
+#endif  // AVX INTRINSICS
+#else
+    __m128 tmp = _mm_shuffle_ps(matrix.m_value.m_value, matrix.m_value.m_value,
+                                _MM_SHUFFLE(0, 2, 1, 3));
+    return _mm_cvtss_f32(_mm_add_ps(matrix.m_value.m_value, tmp));
+#endif  // USE_DOUBLE
+#else
+    return matrix.m_value[0] + matrix.m_value[3];
+#endif  // USE_INTRINSICS
   }
 
   /// Returns the inverse of the given 2x2 matrix.

@@ -75,43 +75,54 @@ class Matrix4x4 {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
+    // [x_x, y_x, x_z, y_z]
+    __m256d tmp0 = _mm256_shuffle_pd(x_axis.m_value, y_axis.m_value, 0b0000);
+    // [z_x, t_x, z_z, t_z]
+    __m256d tmp1 =
+        _mm256_shuffle_pd(z_axis.m_value, translation.m_value, 0b0000);
+    // [x_y, y_y, x_w, y_w]
+    __m256d tmp2 = _mm256_shuffle_pd(x_axis.m_value, y_axis.m_value, 0b1111);
+    // [z_y, t_y, z_w, t_w]
+    __m256d tmp3 =
+        _mm256_shuffle_pd(z_axis.m_value, translation.m_value, 0b1111);
+
     // [x_x, y_x, x_y, y_y]
     m_value[0].m_value.m_value =
-        _mm256_shuffle_pd(x_axis.m_value, y_axis.m_value, 0b0000);
+        _mm256_permute2f128_pd(tmp0, tmp2, _MM_SHUFFLE(0, 2, 0, 0));
     // [z_x, t_x, z_y, t_y]
     m_value[1].m_value.m_value =
-        _mm256_shuffle_pd(z_axis.m_value, translation.m_value, 0b0000);
+        _mm256_permute2f128_pd(tmp1, tmp3, _MM_SHUFFLE(0, 2, 0, 0));
     // [x_z, y_z, x_w, y_w]
     m_value[2].m_value.m_value =
-        _mm256_shuffle_pd(x_axis.m_value, y_axis.m_value, 0b1111);
+        _mm256_permute2f128_pd(tmp0, tmp2, _MM_SHUFFLE(0, 3, 0, 1));
     // [z_z, t_z, z_w, t_w]
     m_value[3].m_value.m_value =
-        _mm256_shuffle_pd(z_axis.m_value, translation.m_value, 0b1111);
+        _mm256_permute2f128_pd(tmp1, tmp3, _MM_SHUFFLE(0, 3, 0, 1));
 #else
     // [x_x, y_x]
     m_value[0].m_value.m_value[0] =
         _mm_shuffle_pd(x_axis.m_value[0], y_axis.m_value[0], 0b00);
     // [x_y, y_y]
     m_value[0].m_value.m_value[1] =
-        _mm_shuffle_pd(x_axis.m_value[1], y_axis.m_value[1], 0b00);
+        _mm_shuffle_pd(x_axis.m_value[0], y_axis.m_value[0], 0b11);
     // [z_x, t_x]
     m_value[1].m_value.m_value[0] =
-        _mm256_shuffle_pd(z_axis.m_value[0], translation.m_value[0], 0b00);
+        _mm_shuffle_pd(z_axis.m_value[0], translation.m_value[0], 0b00);
     // [z_y, t_y]
     m_value[1].m_value.m_value[1] =
-        _mm256_shuffle_pd(z_axis.m_value[1], translation.m_value[1], 0b00);
+        _mm_shuffle_pd(z_axis.m_value[0], translation.m_value[0], 0b11);
     // [x_z, y_z]
     m_value[2].m_value.m_value[0] =
-        _mm256_shuffle_pd(x_axis.m_value[0], y_axis.m_value[0], 0b11);
+        _mm_shuffle_pd(x_axis.m_value[1], y_axis.m_value[1], 0b00);
     // [x_w, y_w]
     m_value[2].m_value.m_value[1] =
-        _mm256_shuffle_pd(x_axis.m_value[1], y_axis.m_value[1], 0b11);
+        _mm_shuffle_pd(x_axis.m_value[1], y_axis.m_value[1], 0b11);
     // [z_z, t_z]
     m_value[3].m_value.m_value[0] =
-        _mm256_shuffle_pd(z_axis.m_value[0], translation.m_value[0], 0b11);
+        _mm_shuffle_pd(z_axis.m_value[1], translation.m_value[1], 0b00);
     // [z_w, t_w]
     m_value[3].m_value.m_value[1] =
-        _mm256_shuffle_pd(z_axis.m_value[1], translation.m_value[1], 0b11);
+        _mm_shuffle_pd(z_axis.m_value[1], translation.m_value[1], 0b11);
 #endif  // AVX INTRINSICS
 #else
     // [x_x, x_y, y_x, y_y]
@@ -358,7 +369,7 @@ class Matrix4x4 {
 #endif
   }
 
-  friend inline Vector operator*(const Matrix4x4 &lhs, const Vector &rhs) {
+  inline Vector operator*(const Vector &rhs) const {
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4  matrix-vector mulitplication for AVX512.
 #else
@@ -374,22 +385,23 @@ class Matrix4x4 {
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
     __m256d zero = _mm256_setzero_pd();
-    __m256d mat_x =
-        _mm256_shuffle_pd(rhs.m_value, zero, _MM_SHUFFLE(3, 2, 1, 0));
-    // [z, t, 0, 0]
-    __m256d mat_y =
-        _mm256_permute2f128_pd(rhs.m_value, zero, _MM_SHUFFLE(0, 2, 0, 1));
-    mat_y = _mm256_permute4x64_pd(mat_y, _MM_SHUFFLE(3, 1, 2, 0));
-    Matrix2x2 X{Vector{mat_x}};
-    Matrix2x2 Y{Vector{mat_y}};
+    // [x, 0, z, 0]
+    __m256d mat_x = _mm256_shuffle_pd(rhs.m_value, zero, 0b0000);
+    // [y, 0, t, 0]
+    __m256d mat_y = _mm256_shuffle_pd(rhs.m_value, zero, 0b0101);
+
+    Matrix2x2 X{
+        Vector{_mm256_permute2f128_pd(mat_x, mat_y, _MM_SHUFFLE(0, 2, 0, 0))}};
+    Matrix2x2 Y{
+        Vector{_mm256_permute2f128_pd(mat_x, mat_y, _MM_SHUFFLE(0, 3, 0, 1))}};
 #else
     __m128d zero = _mm_setzero_pd();
     __m128d mat_x0 = _mm_shuffle_pd(rhs.m_value[0], zero, _MM_SHUFFLE2(1, 0));
     __m128d mat_x1 = _mm_shuffle_pd(rhs.m_value[0], zero, _MM_SHUFFLE2(1, 1));
     __m128d mat_y0 = _mm_shuffle_pd(rhs.m_value[1], zero, _MM_SHUFFLE2(1, 0));
     __m128d mat_y1 = _mm_shuffle_pd(rhs.m_value[1], zero, _MM_SHUFFLE2(1, 1));
-    Matrix2x2 X{Vector{mat_x0, mat_x1}};
-    Matrix2x2 Y{Vector{mat_y0, mat_y1}};
+    Matrix2x2 X{Vector{{mat_x0, mat_x1}}};
+    Matrix2x2 Y{Vector{{mat_y0, mat_y1}}};
 #endif  // AVX INTRINSICS
 #else
     __m128 zero = _mm_setzero_ps();
@@ -404,15 +416,62 @@ class Matrix4x4 {
     Matrix2x2 X{Vector{rhs[0], 0.0, rhs[1], 0.0}};
     Matrix2x2 Y{Vector{rhs[2], 0.0, rhs[3], 0.0}};
 #endif  // USE_INTRINSICS
-    Matrix2x2 res_x = lhs.m_value[0] * X + lhs.m_value[1] * Y;
-    Matrix2x2 res_y = lhs.m_value[2] * X + lhs.m_value[3] * Y;
+    Matrix2x2 res_x = m_value[0] * X + m_value[1] * Y;
+    Matrix2x2 res_y = m_value[2] * X + m_value[3] * Y;
     return Vector{res_x.m_value[0], res_x.m_value[2], res_y.m_value[0],
                   res_y.m_value[2]};
 #endif
   }
 
+  // Type-Conversions
+  /// Convert to a human-readable string value.
+  explicit inline operator std::string() const {
+#ifdef USE_INTRINSICS
+#if defined(__AVX512F__)
+    // TODO: Matrix4x4 string conversion for AVX512.
+#else
+    std::array<FLOAT, 4> x{}, y{}, z{}, w{};
+    m_value[0].m_value.get(x.data());
+    m_value[1].m_value.get(y.data());
+    m_value[2].m_value.get(z.data());
+    m_value[3].m_value.get(w.data());
+    return "[" + std::to_string(x[0]) + ", " + std::to_string(x[1]) + ", " +
+           std::to_string(y[0]) + ", " + std::to_string(y[1]) + "\n" +
+           std::to_string(x[2]) + ", " + std::to_string(x[3]) + ", " +
+           std::to_string(y[2]) + ", " + std::to_string(y[3]) + "\n" +
+           std::to_string(z[0]) + ", " + std::to_string(z[1]) + ", " +
+           std::to_string(w[0]) + ", " + std::to_string(w[1]) + "\n" +
+           std::to_string(z[2]) + ", " + std::to_string(z[3]) + ", " +
+           std::to_string(w[2]) + ", " + std::to_string(w[3]) + "]";
+#endif
+#else
+    return "[" + std::to_string(m_value[0].m_value[0]) + ", " +
+           std::to_string(m_value[0].m_value[1]) + ", " +
+           std::to_string(m_value[1].m_value[0]) + ", " +
+           std::to_string(m_value[1].m_value[1]) + "\n" +
+           std::to_string(m_value[0].m_value[2]) + ", " +
+           std::to_string(m_value[0].m_value[3]) + ", " +
+           std::to_string(m_value[1].m_value[2]) + ", " +
+           std::to_string(m_value[1].m_value[3]) + "\n" +
+           std::to_string(m_value[2].m_value[0]) + ", " +
+           std::to_string(m_value[2].m_value[1]) + ", " +
+           std::to_string(m_value[3].m_value[0]) + ", " +
+           std::to_string(m_value[3].m_value[1]) + "\n" +
+           std::to_string(m_value[2].m_value[2]) + ", " +
+           std::to_string(m_value[2].m_value[3]) + ", " +
+           std::to_string(m_value[3].m_value[2]) + ", " +
+           std::to_string(m_value[3].m_value[3]) + "]";
+#endif  // USE_INTRINSICS
+  }
+
+  friend inline std::ostream &operator<<(std::ostream &out,
+                                         const Matrix4x4 &mat) {
+    return out << static_cast<std::string>(mat);
+  }
+
   // Functions
 
+  /// Returns the transpose of the given 4x4 matrix.
   static inline Matrix4x4 transpose(const Matrix4x4 &matrix) {
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4  transpose for AVX512.
@@ -429,6 +488,8 @@ class Matrix4x4 {
                                  Matrix2x2::transpose(matrix.m_value[3])}};
 #endif
   }
+
+  /// Calculates the determinant of the given 4x4 matrix.
   [[nodiscard]] inline FLOAT determinant() const {
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4  determinant for AVX512.
@@ -440,12 +501,18 @@ class Matrix4x4 {
     // | e    f    g    h | ==  | C   D |
     // | i    j    k    l |
     // | m    n    o    p |
-    // Determinant = Determinant(A)*Determinant(D- C*Inverse(A)*B);
-    //             = Determinant(AD - BC)
-    return (m_value[0] * m_value[3] - m_value[1] * m_value[2]).determinant();
+    // Determinant = Determinant(A)*Determinant(D- C*Inverse(A)*B)
+    //             = Determinant(D)*Determinant(A- C*Inverse(D)*B)
+    //             = Det(A)*Det(D) + Det(B)*Det(C) - Trace(
+    //             ((Adj(A)*B)*((Adj(D)*C))
+    return m_value[0].determinant() * m_value[3].determinant() +
+           m_value[1].determinant() * m_value[2].determinant() -
+           Matrix2x2::trace((Matrix2x2::adjoint(m_value[0]) * m_value[1]) *
+                            (Matrix2x2::adjoint(m_value[3]) * m_value[2]));
 #endif
   }
 
+  /// Returns the inverse of the given 4x4 matrix.
   static inline Matrix4x4 inverse(const Matrix4x4 &matrix) {
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4  inverse for AVX512.

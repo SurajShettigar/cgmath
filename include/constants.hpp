@@ -4,12 +4,12 @@
 #ifndef CGMATH_CONSTANTS_HPP
 #define CGMATH_CONSTANTS_HPP
 
-#include <cmath>
-#include <limits>
-#include <cstring>
 #include <array>
-#include <string>
+#include <cmath>
+#include <cstring>
 #include <iostream>
+#include <limits>
+#include <string>
 
 namespace cgmath {
 #ifdef USE_DOUBLE
