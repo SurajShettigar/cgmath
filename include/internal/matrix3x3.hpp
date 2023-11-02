@@ -146,27 +146,408 @@ class Matrix3x3 {
   }
 
   /// Matrix-Matrix multiplication.
-  friend inline Matrix3x3 operator*(const Matrix3x3 &lhs,
-                                    const Matrix3x3 &rhs) {
-    Matrix3x3 temp = Matrix3x3::transpose(rhs);
+  inline Matrix3x3 operator*(const Matrix3x3 &rhs) const {
+    // | a  b  c | x | j  k  l |
+    // | d  e  f |   | m  n  o |
+    // | g  h  i |   | p  q  r |
+    // =
+    // | aj+bm+cp  ak+bn+cq  al+bo+cr |
+    // | dj+em+fp  dk+en+fq  dl+eo+fr |
+    // | gj+hm+ip  gk+hn+iq  gl+ho+ir |
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    std::array<FLOAT, 4> val{};
+    m_value[0].get(val.data());
+    // [a, a, a, a]
+    __m256d tmp0 = _mm256_set1_pd(val[0]);
+    // [b, b, b, b]
+    __m256d tmp1 = _mm256_set1_pd(val[1]);
+    // [c, c, c, c]
+    __m256d tmp2 = _mm256_set1_pd(val[2]);
+
+    // [aj, ak, al, 0]
+    tmp0 = _mm256_mul_pd(tmp0, rhs.m_value[0].m_value);
+    // [bm, bn, bo, 0]
+    tmp1 = _mm256_mul_pd(tmp1, rhs.m_value[1].m_value);
+    // [cp, cq, cr, 0]
+    tmp2 = _mm256_mul_pd(tmp2, rhs.m_value[2].m_value);
+
+    // [aj + bm, ak + bn, al + bo, 0]
+    __m256d row0 = _mm256_add_pd(tmp0, tmp1);
+    // [aj + bm + cp, ak + bn + cq, al + bo + cr, 0]
+    row0 = _mm256_add_pd(row0, tmp2);
+
+    m_value[1].get(val.data());
+    // [d, d, d, d]
+    tmp0 = _mm256_set1_pd(val[0]);
+    // [e, e, e, e]
+    tmp1 = _mm256_set1_pd(val[1]);
+    // [f, f, f, f]
+    tmp2 = _mm256_set1_pd(val[2]);
+
+    // [dj, dk, dl, 0]
+    tmp0 = _mm256_mul_pd(tmp0, rhs.m_value[0].m_value);
+    // [em, en, eo, 0]
+    tmp1 = _mm256_mul_pd(tmp1, rhs.m_value[1].m_value);
+    // [fp, fq, fr, 0]
+    tmp2 = _mm256_mul_pd(tmp2, rhs.m_value[2].m_value);
+
+    // [dj + em, dk + en, dl + eo, 0]
+    __m256d row1 = _mm256_add_pd(tmp0, tmp1);
+    // [dj + em + fp, dk + en + fq, dl + eo + fr, 0]
+    row1 = _mm256_add_pd(row1, tmp2);
+
+    m_value[2].get(val.data());
+    // [g, g, g, g]
+    tmp0 = _mm256_set1_pd(val[0]);
+    // [h, h, h, h]
+    tmp1 = _mm256_set1_pd(val[1]);
+    // [i, i, i, i]
+    tmp2 = _mm256_set1_pd(val[2]);
+
+    // [gj, gk, gl, 0]
+    tmp0 = _mm256_mul_pd(tmp0, rhs.m_value[0].m_value);
+    // [hm, hn, ho, 0]
+    tmp1 = _mm256_mul_pd(tmp1, rhs.m_value[1].m_value);
+    // [ip, iq, ir, 0]
+    tmp2 = _mm256_mul_pd(tmp2, rhs.m_value[2].m_value);
+
+    // [gj + hm, gk + hn, gl + ho, 0]
+    __m256d row2 = _mm256_add_pd(tmp0, tmp1);
+    // [gj + hm + ip, gk + hn + iq, gl + ho + ir, 0]
+    row2 = _mm256_add_pd(row2, tmp2);
+
     return Matrix3x3{
-        Vector::dot(lhs.getRow(0), temp.getRow(0)),
-        Vector::dot(lhs.getRow(1), temp.getRow(0)),
-        Vector::dot(lhs.getRow(2), temp.getRow(0)),
-        Vector::dot(lhs.getRow(0), temp.getRow(1)),
-        Vector::dot(lhs.getRow(1), temp.getRow(1)),
-        Vector::dot(lhs.getRow(2), temp.getRow(1)),
-        Vector::dot(lhs.getRow(0), temp.getRow(2)),
-        Vector::dot(lhs.getRow(1), temp.getRow(2)),
-        Vector::dot(lhs.getRow(2), temp.getRow(2)),
-    };
+        std::array<Vector, 3>{Vector{row0}, Vector{row1}, Vector{row2}}};
+#else
+    // [a, a]
+    __m128d tmp0 =
+        _mm_shuffle_pd(m_value[0].m_value[0], m_value[0].m_value[0], 0b00);
+    // [b, b]
+    __m128d tmp1 =
+        _mm_shuffle_pd(m_value[0].m_value[0], m_value[0].m_value[0], 0b11);
+    // [c, c]
+    __m128d tmp2 =
+        _mm_shuffle_pd(m_value[0].m_value[1], m_value[0].m_value[1], 0b00);
+
+    // [aj, ak]
+    tmp0 = _mm_mul_pd(tmp0, rhs.m_value[0].m_value[0]);
+    // [bm, bn]
+    tmp1 = _mm_mul_pd(tmp1, rhs.m_value[1].m_value[0]);
+    // [cp, cq]
+    tmp2 = _mm_mul_pd(tmp2, rhs.m_value[2].m_value[0]);
+
+    __m128d row00 = _mm_add_pd(tmp0, tmp1);
+    // [aj + bm + cp, ak + bn + cq]
+    row00 = _mm_add_pd(row00, tmp2);
+
+    // [al, 0]
+    tmp0 = _mm_mul_pd(m_value[0].m_value[0], rhs.m_value[0].m_value[1]);
+    // [bo, 0]
+    tmp1 = _mm_mul_pd(
+        _mm_shuffle_pd(m_value[0].m_value[0], m_value[0].m_value[0], 0b01),
+        rhs.m_value[1].m_value[1]);
+    // [cr, 0]
+    tmp2 = _mm_mul_pd(m_value[0].m_value[1], rhs.m_value[2].m_value[1]);
+
+    __m128d row01 = _mm_add_pd(tmp0, tmp1);
+    // [al + bo + cr, 0]
+    row01 = _mm_add_pd(row01, tmp2);
+
+    // [d, d]
+    tmp0 = _mm_shuffle_pd(m_value[1].m_value[0], m_value[1].m_value[0], 0b00);
+    // [e, e]
+    tmp1 = _mm_shuffle_pd(m_value[1].m_value[0], m_value[1].m_value[0], 0b11);
+    // [f, f]
+    tmp2 = _mm_shuffle_pd(m_value[1].m_value[1], m_value[1].m_value[1], 0b00);
+
+    // [dj, dk]
+    tmp0 = _mm_mul_pd(tmp0, rhs.m_value[0].m_value[0]);
+    // [em, en]
+    tmp1 = _mm_mul_pd(tmp1, rhs.m_value[1].m_value[0]);
+    // [fp, fq]
+    tmp2 = _mm_mul_pd(tmp2, rhs.m_value[2].m_value[0]);
+
+    __m128d row10 = _mm_add_pd(tmp0, tmp1);
+    // [dj + em + fp, dk + en + fq]
+    row10 = _mm_add_pd(row10, tmp2);
+
+    // [dl, 0]
+    tmp0 = _mm_mul_pd(m_value[1].m_value[0], rhs.m_value[0].m_value[1]);
+    // [eo, 0]
+    tmp1 = _mm_mul_pd(
+        _mm_shuffle_pd(m_value[1].m_value[0], m_value[1].m_value[0], 0b01),
+        rhs.m_value[1].m_value[1]);
+    // [fr, 0]
+    tmp2 = _mm_mul_pd(m_value[1].m_value[1], rhs.m_value[2].m_value[1]);
+
+    __m128d row11 = _mm_add_pd(tmp0, tmp1);
+    // [al + bo + cr, 0]
+    row11 = _mm_add_pd(row11, tmp2);
+
+    // [g, g]
+    tmp0 = _mm_shuffle_pd(m_value[2].m_value[0], m_value[2].m_value[0], 0b00);
+    // [h, h]
+    tmp1 = _mm_shuffle_pd(m_value[2].m_value[0], m_value[2].m_value[0], 0b11);
+    // [i, i]
+    tmp2 = _mm_shuffle_pd(m_value[2].m_value[1], m_value[2].m_value[1], 0b00);
+
+    // [gj, gk]
+    tmp0 = _mm_mul_pd(tmp0, rhs.m_value[0].m_value[0]);
+    // [hm, hn]
+    tmp1 = _mm_mul_pd(tmp1, rhs.m_value[1].m_value[0]);
+    // [ip, iq]
+    tmp2 = _mm_mul_pd(tmp2, rhs.m_value[2].m_value[0]);
+
+    __m128d row20 = _mm_add_pd(tmp0, tmp1);
+    // [gj + hm + ip, gk + hn + iq]
+    row20 = _mm_add_pd(row20, tmp2);
+
+    // [gl, 0]
+    tmp0 = _mm_mul_pd(m_value[2].m_value[0], rhs.m_value[0].m_value[1]);
+    // [ho, 0]
+    tmp1 = _mm_mul_pd(
+        _mm_shuffle_pd(m_value[2].m_value[0], m_value[1].m_value[0], 0b01),
+        rhs.m_value[1].m_value[1]);
+    // [ir, 0]
+    tmp2 = _mm_mul_pd(m_value[2].m_value[1], rhs.m_value[2].m_value[1]);
+
+    __m128d row21 = _mm_add_pd(tmp0, tmp1);
+    // [gl + ho + ir, 0]
+    row21 = _mm_add_pd(row21, tmp2);
+
+    return Matrix3x3{std::array<Vector, 3>{Vector{{row00, row01}},
+                                           Vector{{row10, row11}},
+                                           Vector{{row20, row21}}}};
+#endif  // AVX INTRINSICS
+#else
+    // [a, a, a, a]
+    __m128 tmp0 = _mm_shuffle_ps(m_value[0].m_value, m_value[0].m_value,
+                                 _MM_SHUFFLE(0, 0, 0, 0));
+    // [b, b, b, b]
+    __m128 tmp1 = _mm_shuffle_ps(m_value[0].m_value, m_value[0].m_value,
+                                 _MM_SHUFFLE(1, 1, 1, 1));
+    // [c, c, c, c]
+    __m128 tmp2 = _mm_shuffle_ps(m_value[0].m_value, m_value[0].m_value,
+                                 _MM_SHUFFLE(2, 2, 2, 2));
+
+    // [aj, ak, al, 0]
+    tmp0 = _mm_mul_ps(tmp0, rhs.m_value[0].m_value);
+    // [bm, bn, bo, 0]
+    tmp1 = _mm_mul_ps(tmp1, rhs.m_value[1].m_value);
+    // [cp, cq, cr, 0]
+    tmp2 = _mm_mul_ps(tmp2, rhs.m_value[2].m_value);
+
+    __m128 row0 = _mm_add_ps(tmp0, tmp1);
+    // [aj + bm + cp, ak + bn + cq, al + bo + cr, 0]
+    row0 = _mm_add_ps(row0, tmp2);
+
+    // [d, d, d, d]
+    tmp0 = _mm_shuffle_ps(m_value[1].m_value, m_value[1].m_value,
+                          _MM_SHUFFLE(0, 0, 0, 0));
+    // [e, e, e, e]
+    tmp1 = _mm_shuffle_ps(m_value[1].m_value, m_value[1].m_value,
+                          _MM_SHUFFLE(1, 1, 1, 1));
+    // [f, f, f, f]
+    tmp2 = _mm_shuffle_ps(m_value[1].m_value, m_value[1].m_value,
+                          _MM_SHUFFLE(2, 2, 2, 2));
+
+    // [dj, dk, dl, 0]
+    tmp0 = _mm_mul_ps(tmp0, rhs.m_value[0].m_value);
+    // [em, en, eo, 0]
+    tmp1 = _mm_mul_ps(tmp1, rhs.m_value[1].m_value);
+    // [fp, fq, fr, 0]
+    tmp2 = _mm_mul_ps(tmp2, rhs.m_value[2].m_value);
+
+    __m128 row1 = _mm_add_ps(tmp0, tmp1);
+    // [dj + em + fp, dk + en + fq, dl + eo + fr, 0]
+    row1 = _mm_add_ps(row1, tmp2);
+
+    // [g, g, g, g]
+    tmp0 = _mm_shuffle_ps(m_value[2].m_value, m_value[2].m_value,
+                          _MM_SHUFFLE(0, 0, 0, 0));
+    // [h, h, h, h]
+    tmp1 = _mm_shuffle_ps(m_value[2].m_value, m_value[2].m_value,
+                          _MM_SHUFFLE(1, 1, 1, 1));
+    // [i, i, i, i]
+    tmp2 = _mm_shuffle_ps(m_value[2].m_value, m_value[2].m_value,
+                          _MM_SHUFFLE(2, 2, 2, 2));
+
+    // [gj, gk, gl, 0]
+    tmp0 = _mm_mul_ps(tmp0, rhs.m_value[0].m_value);
+    // [hm, hn, ho, 0]
+    tmp1 = _mm_mul_ps(tmp1, rhs.m_value[1].m_value);
+    // [ip, iq, ir, 0]
+    tmp2 = _mm_mul_ps(tmp2, rhs.m_value[2].m_value);
+
+    __m128 row2 = _mm_add_ps(tmp0, tmp1);
+    // [gj + hm + ip, gk + hn + iq, gl + ho + ir, 0]
+    row2 = _mm_add_ps(row2, tmp2);
+
+    return Matrix3x3{
+        std::array<Vector, 3>{Vector{row0}, Vector{row1}, Vector{row2}}};
+#endif  // USE_DOUBLE
+#else
+    return Matrix3x3{
+        std::array<Vector, 3>{Vector{m_value[0][0] * rhs.m_value[0][0] +
+                                         m_value[0][1] * rhs.m_value[1][0] +
+                                         m_value[0][2] * rhs.m_value[2][0],
+                                     m_value[0][0] * rhs.m_value[0][1] +
+                                         m_value[0][1] * rhs.m_value[1][1] +
+                                         m_value[0][2] * rhs.m_value[2][1],
+                                     m_value[0][0] * rhs.m_value[0][2] +
+                                         m_value[0][1] * rhs.m_value[1][2] +
+                                         m_value[0][2] * rhs.m_value[2][2],
+                                     0.0},
+                              Vector{m_value[1][0] * rhs.m_value[0][0] +
+                                         m_value[1][1] * rhs.m_value[1][0] +
+                                         m_value[1][2] * rhs.m_value[2][0],
+                                     m_value[1][0] * rhs.m_value[0][1] +
+                                         m_value[1][1] * rhs.m_value[1][1] +
+                                         m_value[1][2] * rhs.m_value[2][1],
+                                     m_value[1][0] * rhs.m_value[0][2] +
+                                         m_value[1][1] * rhs.m_value[1][2] +
+                                         m_value[1][2] * rhs.m_value[2][2],
+                                     0.0},
+                              Vector{m_value[2][0] * rhs.m_value[0][0] +
+                                         m_value[2][1] * rhs.m_value[1][0] +
+                                         m_value[2][2] * rhs.m_value[2][0],
+                                     m_value[2][0] * rhs.m_value[0][1] +
+                                         m_value[2][1] * rhs.m_value[1][1] +
+                                         m_value[2][2] * rhs.m_value[2][1],
+                                     m_value[2][0] * rhs.m_value[0][2] +
+                                         m_value[2][1] * rhs.m_value[1][2] +
+                                         m_value[2][2] * rhs.m_value[2][2],
+                                     0.0}}};
+#endif  // USE_INTRINSICS
   }
 
   /// Matrix-3D Column vector multiplication.
-  friend inline Vector operator*(const Matrix3x3 &lhs, const Vector &rhs) {
-    return Vector{Vector::dot(lhs.getRow(0), rhs),
-                  Vector::dot(lhs.getRow(1), rhs),
-                  Vector::dot(lhs.getRow(2), rhs), 0.0};
+  inline Vector operator*(const Vector &rhs) const {
+// | a  b  c | x | x |
+// | d  e  f |   | y |
+// | g  h  i |   | z |
+// =
+// | ax+by+cz |
+// | dx+ey+fz |
+// | gx+hy+iz |
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+    // [ax, by, cz, 0]
+    __m256d tmp0 = _mm256_mul_pd(m_value[0].m_value, rhs.m_value);
+    // [dx, ey, fz, 0]
+    __m256d tmp1 = _mm256_mul_pd(m_value[1].m_value, rhs.m_value);
+    // [gx, hy, iz, 0]
+    __m256d tmp2 = _mm256_mul_pd(m_value[2].m_value, rhs.m_value);
+
+    // [ax, dx, cz, fz]
+    __m256d res0 = _mm256_shuffle_pd(tmp0, tmp1, 0b0000);
+    // [cz, fz, iz, 0]
+    __m256d res1 = _mm256_permute2f128_pd(res0, tmp2, _MM_SHUFFLE(0, 3, 0, 1));
+    // [gx, 0, hy, 0]
+    __m256d res2 = _mm256_permute4x64_pd(tmp2, _MM_SHUFFLE(3, 1, 3, 0));
+
+    // [ax, dx, gx, 0]
+    res0 = _mm256_permute2f128_pd(res0, res2, _MM_SHUFFLE(0, 2, 0, 0));
+    // [ax + cz, dx + fz, gx + iz, 0]
+    res0 = _mm256_add_pd(res0, res1);
+
+    // [by, ey, 0, 0]
+    res1 = _mm256_shuffle_pd(tmp0, tmp1, 0b1111);
+    // [by, ey, hy, 0]
+    res1 = _mm256_permute2f128_pd(res1, res2, _MM_SHUFFLE(0, 3, 0, 0));
+
+    // ax + by + cz, dx + ey + fz, gx + hy + iz, 0]
+    res0 = _mm256_add_pd(res0, res1);
+
+    return Vector{res0};
+#else
+    // [ax, by]
+    __m128d tmp0 = _mm_mul_pd(m_value[0].m_value[0], rhs.m_value[0]);
+    // [dx, ey]
+    __m128d tmp1 = _mm_mul_pd(m_value[1].m_value[0], rhs.m_value[0]);
+    // [ax, dx]
+    __m128d tmp2 = _mm_shuffle_pd(tmp0, tmp1, 0b00);
+    // [by, ey]
+    __m128d tmp3 = _mm_shuffle_pd(tmp0, tmp1, 0b11);
+
+    // [ax + by, dx + ey]
+    tmp0 = _mm_add_pd(tmp2, tmp3);
+
+    // [cz, 0]
+    tmp1 = _mm_mul_pd(m_value[0].m_value[1], rhs.m_value[1]);
+    // [fz, 0]
+    tmp2 = _mm_mul_pd(m_value[1].m_value[1], rhs.m_value[1]);
+    // [cz, fz]
+    tmp1 = _mm_shuffle_pd(tmp1, tmp2, 0b00);
+
+    // [ax + by + cz, dx + ey + fz]
+    tmp0 = _mm_add_pd(tmp0, tmp1);
+
+    // [gx, hy]
+    tmp1 = _mm_mul_pd(m_value[2].m_value[0], rhs.m_value[0]);
+    // [iz, 0]
+    tmp2 = _mm_mul_pd(m_value[2].m_value[1], rhs.m_value[1]);
+
+    // [gx + iz, hy]
+    tmp3 = _mm_add_pd(tmp1, tmp2);
+    // [hy, 0]
+    tmp1 = _mm_shuffle_pd(tmp1, tmp2, 0b11);
+
+    // [gx + iz + hy, hy]
+    tmp3 = _mm_add_pd(tmp3, tmp1);
+    // [gx + iz + hy, 0]
+    tmp3 = _mm_shuffle_pd(tmp3, tmp1, 0b10);
+
+    return Vector{{tmp0, tmp3}};
+#endif  // AVX INTRINSICS
+#else
+    // [ax, by, cz, 0]
+    __m128 tmp0 = _mm_mul_ps(m_value[0].m_value, rhs.m_value);
+    // [dx, ey, fz, 0]
+    __m128 tmp1 = _mm_mul_ps(m_value[1].m_value, rhs.m_value);
+    // [gx, hy, iz, 0]
+    __m128 tmp2 = _mm_mul_ps(m_value[2].m_value, rhs.m_value);
+
+    // [ax, by, dx, ey]
+    __m128 res0 = _mm_movelh_ps(tmp0, tmp1);
+    // [ax, dx, by, ey]
+    res0 = _mm_shuffle_ps(res0, res0, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [0, hy, by, ey]
+    __m128 res1 = _mm_shuffle_ps(tmp2, res0, _MM_SHUFFLE(3, 2, 1, 3));
+    // [by, ey, hy, 0]
+    res1 = _mm_shuffle_ps(res1, res1, _MM_SHUFFLE(0, 1, 3, 2));
+
+    // [ax, dx, gx, 0]
+    res0 = _mm_shuffle_ps(res0, tmp2, _MM_SHUFFLE(3, 0, 1, 0));
+
+    // [ax + by, dx + ey, gx + hy, 0]
+    res0 = _mm_add_ps(res0, res1);
+
+    // [cz, 0, fz, 0]
+    res1 = _mm_shuffle_ps(tmp0, tmp1, _MM_SHUFFLE(3, 2, 3, 2));
+    // [cz, fz, 0, 0]
+    res1 = _mm_shuffle_ps(res1, res1, _MM_SHUFFLE(3, 1, 2, 0));
+    // [cz, fz, iz, 0]
+    res1 = _mm_shuffle_ps(res1, tmp2, _MM_SHUFFLE(3, 2, 1, 0));
+
+    // [ax + by + cz, dx + ey + fz, gx + hy + iz, 0]
+    res0 = _mm_add_ps(res0, res1);
+
+    return Vector{res0};
+#endif  // USE_DOUBLE
+#else
+    return Vector{m_value[0][0] * rhs[0] + m_value[0][1] * rhs[1] +
+                      m_value[0][2] * rhs[2],
+                  m_value[1][0] * rhs[0] + m_value[1][1] * rhs[1] +
+                      m_value[1][2] * rhs[2],
+                  m_value[2][0] * rhs[0] + m_value[2][1] * rhs[1] +
+                      m_value[2][2] * rhs[2],
+                  0.0};
+#endif  // USE_INTRINSICS
   }
 
   friend inline Matrix3x3 operator*(const Matrix3x3 &lhs, FLOAT rhs) {

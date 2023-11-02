@@ -237,15 +237,15 @@ class Matrix2x2 {
     // [a, a, c, c]
     __m256d tmp0 = _mm256_shuffle_pd(m_value.m_value, m_value.m_value, 0b0000);
     // [x, y, x, y]
-    __m256d tmp1 = _mm256_permute4x64_pd(rhs.m_value.m_value, _MM_SHUFFLE(1, 0, 1, 0));
+    __m256d tmp1 =
+        _mm256_permute4x64_pd(rhs.m_value.m_value, _MM_SHUFFLE(1, 0, 1, 0));
     // [ax, ay, cx, cy]
     __m256d res = _mm256_mul_pd(tmp0, tmp1);
 
     // [b, b, d, d]
     tmp0 = _mm256_shuffle_pd(m_value.m_value, m_value.m_value, 0b1111);
     // [z, w, z, w]
-    tmp1 = _mm256_permute4x64_pd(rhs.m_value.m_value,
-                                 _MM_SHUFFLE(3, 2, 3, 2));
+    tmp1 = _mm256_permute4x64_pd(rhs.m_value.m_value, _MM_SHUFFLE(3, 2, 3, 2));
     //[bz, bw, dz, dw]
     tmp1 = _mm256_mul_pd(tmp0, tmp1);
     // [ax + bz, ay + bw, cx + dz, cy + dw]
@@ -253,20 +253,22 @@ class Matrix2x2 {
     return Matrix2x2{Vector{res}};
 #else
     // [a, a]
-    __m128d tmp0 =
-        _mm_shuffle_pd(m_value.m_value[0], m_value.m_value[0], _MM_SHUFFLE2(0, 0));
+    __m128d tmp0 = _mm_shuffle_pd(m_value.m_value[0], m_value.m_value[0],
+                                  _MM_SHUFFLE2(0, 0));
     // [c, c]
-    __m128d tmp1 =
-        _mm_shuffle_pd(m_value.m_value[1], m_value.m_value[1], _MM_SHUFFLE2(0, 0));
+    __m128d tmp1 = _mm_shuffle_pd(m_value.m_value[1], m_value.m_value[1],
+                                  _MM_SHUFFLE2(0, 0));
     // [ax, ay]
     __m128d res0 = _mm_mul_pd(tmp0, rhs.m_value.m_value[0]);
     // [cx, cy]
     __m128d res1 = _mm_mul_pd(tmp1, rhs.m_value.m_value[0]);
 
     // [b, b]
-    tmp0 = _mm_shuffle_pd(m_value.m_value[0], m_value.m_value[0], _MM_SHUFFLE2(1, 1));
+    tmp0 = _mm_shuffle_pd(m_value.m_value[0], m_value.m_value[0],
+                          _MM_SHUFFLE2(1, 1));
     // [d, d]
-    tmp1 = _mm_shuffle_pd(m_value.m_value[1], m_value.m_value[1], _MM_SHUFFLE2(1, 1));
+    tmp1 = _mm_shuffle_pd(m_value.m_value[1], m_value.m_value[1],
+                          _MM_SHUFFLE2(1, 1));
     // [bz, bw]
     tmp0 = _mm_mul_pd(tmp0, rhs.m_value.m_value[1]);
     // [dz, dw]
@@ -281,18 +283,20 @@ class Matrix2x2 {
 #endif  // AVX INTRINSICS
 #else
     // [a, a, c, c]
-    __m128 tmp0 =
-        _mm_shuffle_ps(m_value.m_value, m_value.m_value, _MM_SHUFFLE(2, 2, 0, 0));
+    __m128 tmp0 = _mm_shuffle_ps(m_value.m_value, m_value.m_value,
+                                 _MM_SHUFFLE(2, 2, 0, 0));
     // [x, y, x, y]
-    __m128 tmp1 =
-        _mm_shuffle_ps(rhs.m_value.m_value, rhs.m_value.m_value, _MM_SHUFFLE(1, 0, 1, 0));
+    __m128 tmp1 = _mm_shuffle_ps(rhs.m_value.m_value, rhs.m_value.m_value,
+                                 _MM_SHUFFLE(1, 0, 1, 0));
     // [ax, ay, cx, cy]
     __m128 res = _mm_mul_ps(tmp0, tmp1);
 
     // [b, b, d, d]
-    tmp0 = _mm_shuffle_ps(m_value.m_value, m_value.m_value, _MM_SHUFFLE(3, 3, 1, 1));
+    tmp0 = _mm_shuffle_ps(m_value.m_value, m_value.m_value,
+                          _MM_SHUFFLE(3, 3, 1, 1));
     // [z, w, z, w]
-    tmp1 = _mm_shuffle_ps(rhs.m_value.m_value, rhs.m_value.m_value, _MM_SHUFFLE(3, 2, 3, 2));
+    tmp1 = _mm_shuffle_ps(rhs.m_value.m_value, rhs.m_value.m_value,
+                          _MM_SHUFFLE(3, 2, 3, 2));
     //[bz, bw, dz, dw]
     tmp1 = _mm_mul_ps(tmp0, tmp1);
     // [ax + bz, ay + bw, cx + dz, cy + dw]
@@ -300,11 +304,11 @@ class Matrix2x2 {
     return Matrix2x2{Vector{res}};
 #endif  // USE_DOUBLE
 #else
-    return Matrix2x2{Vector{
-        lhs.m_value[0] * rhs.m_value[0] + lhs.m_value[1] * rhs.m_value[2],
-        lhs.m_value[0] * rhs.m_value[1] + lhs.m_value[1] * rhs.m_value[3],
-        lhs.m_value[2] * rhs.m_value[0] + lhs.m_value[3] * rhs.m_value[2],
-        lhs.m_value[2] * rhs.m_value[1] + lhs.m_value[3] * rhs.m_value[3]}};
+    return Matrix2x2{
+        Vector{m_value[0] * rhs.m_value[0] + m_value[1] * rhs.m_value[2],
+               m_value[0] * rhs.m_value[1] + m_value[1] * rhs.m_value[3],
+               m_value[2] * rhs.m_value[0] + m_value[3] * rhs.m_value[2],
+               m_value[2] * rhs.m_value[1] + m_value[3] * rhs.m_value[3]}};
 #endif  // USE_INTRINSICS
   }
 
@@ -362,8 +366,8 @@ class Matrix2x2 {
     return Vector{tmp1};
 #endif  // USE_DOUBLE
 #else
-    return Vector{lhs.m_value[0] * rhs[0] + lhs.m_value[1] * rhs[1],
-                  lhs.m_value[2] * rhs[0] + lhs.m_value[3] * rhs[1], 0.0, 0.0};
+    return Vector{m_value[0] * rhs[0] + m_value[1] * rhs[1],
+                  m_value[2] * rhs[0] + m_value[3] * rhs[1], 0.0, 0.0};
 #endif  // USE_INTRINSICS
   }
 
