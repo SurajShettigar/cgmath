@@ -561,6 +561,366 @@ class Matrix4x4 {
 #endif
   }
 
+  /**
+   * Creates a 3D scaling matrix from the given x, y and z axis scales.
+   * @param scale 3D vector containing the x, y and z axis scales.
+   * @return 4x4 Affine transform matrix containing only the 3D scale component.
+   */
+  static inline Matrix4x4 scale(const Vector &scale) {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{scale[0], 0.0, 0.0, scale[1]}}, Matrix2x2{Vector{0.0}},
+        Matrix2x2{Vector{0.0}}, Matrix2x2{Vector{scale[2], 0.0, 0.0, 1.0}}}};
+#endif
+  }
+
+  /**
+   * Creates a 3D x-axis rotation matrix from the given angle in degree.
+   * @param angle A scalar angle for x-axis given in degree. The angle is
+   * assumed positive for counter-clockwise rotation and negative for clockwise
+   * rotation.
+   * @return 4x4 Affine transform matrix containing only the x-axis rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationX(FLOAT angle) {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    const FLOAT cos = std::cos(radian(angle));
+    const FLOAT sin = std::sin(radian(angle));
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2{Vector{1.0, 0.0, 0.0, cos}},
+                                 Matrix2x2{Vector{0.0, 0.0, -sin, 0.0}},
+                                 Matrix2x2{Vector{0.0, sin, 0.0, 0.0}},
+                                 Matrix2x2{Vector{cos, 0.0, 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Creates a 3D y-axis rotation matrix from the given angle in degree.
+   * @param angle A scalar angle for y-axis given in degree. The angle is
+   * assumed positive for counter-clockwise rotation and negative for clockwise
+   * rotation.
+   * @return 4x4 Affine transform matrix containing only the y-axis rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationY(FLOAT angle) {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    const FLOAT cos = std::cos(radian(angle));
+    const FLOAT sin = std::sin(radian(angle));
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2{Vector{cos, 0.0, 0.0, 1.0}},
+                                 Matrix2x2{Vector{sin, 0.0, 0.0, 0.0}},
+                                 Matrix2x2{Vector{-sin, 0.0, 0.0, 0.0}},
+                                 Matrix2x2{Vector{cos, 0.0, 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Creates a 3D z-axis rotation matrix from the given angle in degree.
+   * @param angle A scalar angle for z-axis given in degree. The angle is
+   * assumed positive for counter-clockwise rotation and negative for clockwise
+   * rotation.
+   * @return 4x4 Affine transform matrix containing only the z-axis rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationZ(FLOAT angle) {
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    const FLOAT cos = std::cos(radian(angle));
+    const FLOAT sin = std::sin(radian(angle));
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{cos, -sin, sin, cos}}, Matrix2x2{Vector{0.0}},
+        Matrix2x2{Vector{0.0}}, Matrix2x2{Vector{1.0, 0.0, 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Creates a 3D rotation matrix from the given euler angles in degree.
+   * @param angles A 3D vector containing euler angles for each axis. The angle
+   * is assumed positive for counter-clockwise rotation and negative for
+   * clockwise rotation.
+   * @return 4x4 Affine transform matrix containing only the 3D rotational
+   * component.
+   */
+  static inline Matrix4x4 rotation(const Vector &euler_angles) {
+    // R = roll*pitch*head (yaw)
+    // R = R(z)*R(x)*R(y)
+
+    // | cosZ*cosY-sinZ*sinX*sinY  -sinZ*cosX  cosZ*sinY+sinZ*sinX*cosY  0 |
+    // | sinZ*cosY+cosZ*sinX*sinY   cosZ*cosX  sinZ*sinY-cosZ*sinX*cosY  0 |
+    // |        -cosX*sinY            sinX            cosX*cosY          0 |
+    // |             0                 0                  0              1 |
+
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    const std::array<FLOAT, 3> cos{std::cos(euler_angles[0]),
+                                   std::cos(euler_angles[1]),
+                                   std::cos(euler_angles[2])};
+    const std::array<FLOAT, 3> sin{std::sin(euler_angles[0]),
+                                   std::sin(euler_angles[1]),
+                                   std::sin(euler_angles[2])};
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{
+            cos[2] * cos[1] - sin[2] * sin[0] * sin[1], -sin[2] * cos[0],
+            sin[2] * cos[1] + cos[2] * sin[0] * sin[1], cos[2] * cos[0]}},
+        Matrix2x2{Vector{cos[2] * sin[1] + sin[2] * sin[0] * cos[1], 0.0,
+                         sin[2] * sin[1] - cos[2] * sin[0] * cos[1], 0.0}},
+        Matrix2x2{Vector{-cos[0] * sin[1], sin[0], 0.0, 0.0}},
+        Matrix2x2{Vector{cos[0] * cos[1], 0.0, 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Creates a 3D rotation matrix describing a rotation over an arbitrary axis.
+   * @param angle The scalar angle by which to rotate about the given axis. The
+   * angle is assumed positive for counter-clockwise rotation and negative for
+   * clockwise rotation.
+   * @param axis A 3D normalized vector describing the axis around which to
+   * rotate.
+   * @return 4x4 Affine transform matrix containing only the 3D rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationOverAxis(FLOAT angle, const Vector &axis) {
+    // Refer: https://dl.acm.org/doi/10.5555/90767.90908
+    // | cosZ*cosY-sinZ*sinX*sinY  -sinZ*cosX  cosZ*sinY+sinZ*sinX*cosY  0 |
+    // | sinZ*cosY+cosZ*sinX*sinY   cosZ*cosX  sinZ*sinY-cosZ*sinX*cosY  0 |
+    // |        -cosX*sinY            sinX            cosX*cosY          0 |
+    // |             0                 0                  0              1 |
+
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    const FLOAT cos = std::cos(angle);
+    const FLOAT om_cos = static_cast<FLOAT>(1.0) - cos;
+    const FLOAT sin = std::sin(angle);
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{cos + om_cos * axis[0] * axis[0],
+                         om_cos * axis[0] * axis[1] - axis[2] * sin,
+                         om_cos * axis[0] * axis[1] + axis[2] * sin,
+                         cos + om_cos * axis[1] * axis[1]}},
+        Matrix2x2{Vector{om_cos * axis[0] * axis[2] + axis[1] * sin, 0.0,
+                         om_cos * axis[1] * axis[2] - axis[0] * sin, 0.0}},
+        Matrix2x2{Vector{om_cos * axis[0] * axis[2] - axis[1] * sin,
+                         om_cos * axis[1] * axis[2] + axis[0] * sin, 0.0, 0.0}},
+        Matrix2x2{Vector{cos + om_cos * axis[2] * axis[2], 0.0, 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Creates a 3D translation matrix from the given x, y and z axis values.
+   * @param translate 3D vector containing the x, y and z axis translation
+   * values.
+   * @return 4x4 Affine transform matrix containing only the 3D translation
+   * component.
+   */
+  static inline Matrix4x4 translation(const Vector &translate) {
+    // | 1  0  0  x |
+    // | 0  1  0  y |
+    // | 0  0  1  z |
+    // | 0  0  0  1 |
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{1.0, 0.0, 0.0, 1.0}},
+        Matrix2x2{Vector{0.0, translate[0], 0.0, translate[1]}},
+        Matrix2x2{Vector{0.0}},
+        Matrix2x2{Vector{1.0, translate[2], 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Returns the inverse of the given 4x4 affine transformation matrix.
+   * The matrix should have only translation, rotation and scaling components.
+   * @param mat The transform matrix to invert.
+   * @return 4x4 inverse affine transformation matrix
+   */
+  static inline Matrix4x4 transformInverse(const Matrix4x4 &matrix) {
+    // | x_x  y_x  z_x  t_x |
+    // | x_y  y_y  z_y  t_y |
+    // | x_z  y_z  z_z  t_z |
+    // |  0    0    0    1  |
+    // Inverse =
+    // | 1/|x|²*x_x  1/|x|²*x_y  1/|x|²*x_z  dot(-t, 1/|x|²*x) |
+    // | 1/|y|²*y_x  1/|y|²*y_y  1/|y|²*y_z  dot(-t, 1/|y|²*y) |
+    // | 1/|z|²*z_x  1/|z|²*z_y  1/|z|²*z_z  dot(-t, 1/|z|²*z) |
+    // |     0           0           0                1        |
+    // =
+    // | x_x'  x_y'  x_z' dot(-t, x') |
+    // | y_x'  y_y'  y_z' dot(-t, y') |
+    // | z_x'  z_y'  z_z' dot(-t, z') |
+    // |  0     0     0        1      |
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+    // TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    Vector x_axis{matrix.m_value[0].m_value[0], matrix.m_value[0].m_value[2],
+                  matrix.m_value[2].m_value[0], 0.0};
+    Vector y_axis{matrix.m_value[0].m_value[1], matrix.m_value[0].m_value[3],
+                  matrix.m_value[2].m_value[1], 0.0};
+    Vector z_axis{matrix.m_value[1].m_value[0], matrix.m_value[1].m_value[2],
+                  matrix.m_value[3].m_value[0], 0.0};
+    Vector minus_t{-matrix.m_value[1].m_value[1], -matrix.m_value[1].m_value[3],
+                   -matrix.m_value[3].m_value[1], 1.0};
+    const FLOAT x_inv_scale = static_cast<FLOAT>(1.0) / x_axis.lengthSquared();
+    const FLOAT y_inv_scale = static_cast<FLOAT>(1.0) / y_axis.lengthSquared();
+    const FLOAT z_inv_scale = static_cast<FLOAT>(1.0) / z_axis.lengthSquared();
+
+    x_axis *= x_inv_scale;
+    y_axis *= y_inv_scale;
+    z_axis *= z_inv_scale;
+    minus_t = Vector{Vector::dot(minus_t, x_axis), Vector::dot(minus_t, y_axis),
+                     Vector::dot(minus_t, z_axis), 1.0};
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{x_axis[0], x_axis[1], y_axis[0], y_axis[1]}},
+        Matrix2x2{Vector{x_axis[2], minus_t[0], y_axis[2], minus_t[1]}},
+        Matrix2x2{Vector{z_axis[0], z_axis[1], 0.0, 0.0}},
+        Matrix2x2{Vector{z_axis[2], minus_t[2], 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
+  /**
+   * Returns the inverse of the given 4x4 affine transformation matrix with unit
+   * scale. The matrix should have only translation and rotation components.
+   * @param mat The transform matrix to invert.
+   * @return 4x4 inverse affine transformation matrix
+   */
+  static inline Matrix4x4 transformInverseUnitScale(const Matrix4x4 &matrix) {
+// | x_x  y_x  z_x  t_x |
+// | x_y  y_y  z_y  t_y |
+// | x_z  y_z  z_z  t_z |
+// |  0    0    0    1  |
+// Inverse =
+// | x_x  x_y  x_z dot(-t, x) |
+// | y_x  y_y  y_z dot(-t, y) |
+// | z_x  z_y  z_z dot(-t, z) |
+// |  0    0    0       1     |
+#if defined(USE_INTRINSICS) && defined(__AVX512F__)
+// TODO: Matrix4x4 scale for AVX512.
+#else
+#ifdef USE_INTRINSICS
+#ifdef USE_DOUBLE
+#if defined(__AVX2__) || defined(__AVX__)
+
+#else
+
+#endif  // AVX INTRINSICS
+#else
+
+#endif  // USE_DOUBLE
+#else
+    Vector x_axis{matrix.m_value[0].m_value[0], matrix.m_value[0].m_value[2],
+                  matrix.m_value[2].m_value[0], 0.0};
+    Vector y_axis{matrix.m_value[0].m_value[1], matrix.m_value[0].m_value[3],
+                  matrix.m_value[2].m_value[1], 0.0};
+    Vector z_axis{matrix.m_value[1].m_value[0], matrix.m_value[1].m_value[2],
+                  matrix.m_value[3].m_value[0], 0.0};
+    Vector minus_t{-matrix.m_value[1].m_value[1], -matrix.m_value[1].m_value[3],
+                   -matrix.m_value[3].m_value[1], 1.0};
+
+    minus_t = Vector{Vector::dot(minus_t, x_axis), Vector::dot(minus_t, y_axis),
+                     Vector::dot(minus_t, z_axis), 1.0};
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{x_axis[0], x_axis[1], y_axis[0], y_axis[1]}},
+        Matrix2x2{Vector{x_axis[2], minus_t[0], y_axis[2], minus_t[1]}},
+        Matrix2x2{Vector{z_axis[0], z_axis[1], 0.0, 0.0}},
+        Matrix2x2{Vector{z_axis[2], minus_t[2], 0.0, 1.0}}}};
+#endif  // USE_INTRINSICS
+#endif
+  }
+
  private:
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
 #ifdef USE_DOUBLE
