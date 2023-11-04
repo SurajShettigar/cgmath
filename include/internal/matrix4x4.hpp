@@ -494,6 +494,7 @@ class Matrix4x4 {
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4  determinant for AVX512.
 #else
+    // TODO: Matrix4x4 optimize determinant calculation.
     // Block matrix determinant method
     // Refer:
     // https://en.wikipedia.org/wiki/Block_matrix#Block_matrix_determinant
@@ -574,9 +575,18 @@ class Matrix4x4 {
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4 scale for AVX512.
 #else
+
+#if defined(USE_INTRINSICS)
+    std::array<FLOAT, 4> val{};
+    scale.get(val.data());
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{val[0], 0.0, 0.0, val[1]}}, Matrix2x2{Vector{0.0}},
+        Matrix2x2{Vector{0.0}}, Matrix2x2{Vector{val[2], 0.0, 0.0, 1.0}}}};
+#else
     return Matrix4x4{std::array<Matrix2x2, 4>{
         Matrix2x2{Vector{scale[0], 0.0, 0.0, scale[1]}}, Matrix2x2{Vector{0.0}},
         Matrix2x2{Vector{0.0}}, Matrix2x2{Vector{scale[2], 0.0, 0.0, 1.0}}}};
+#endif
 #endif
   }
 
@@ -868,8 +878,8 @@ class Matrix4x4 {
   static inline Matrix4x4 rotationOverAxis(FLOAT angle, const Vector &axis) {
     // Refer: https://dl.acm.org/doi/10.5555/90767.90908
     // |    cos+mcos*a_x²       mcos*a_x*a_y-a_z*sin mcos*a_x*a_z+a_y*sin 0 |
-    // | mcos*a_x*a_y + a_z*sin    cos+om_cos*a_y²   mcos*a_y*a_z-a_x*sin 0 |
-    // | mcos*a_x*a_z - a_y*sin mcos*a_y*a_z+a_x*sin    cos+om_cos*a_z²   0 |
+    // | mcos*a_x*a_y + a_z*sin    cos+mcos*a_y²     mcos*a_y*a_z-a_x*sin 0 |
+    // | mcos*a_x*a_z - a_y*sin mcos*a_y*a_z+a_x*sin    cos+mcos*a_z²     0 |
     // |           0                     0                  0             1 |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
     // TODO: Matrix4x4 scale for AVX512.
@@ -882,7 +892,71 @@ class Matrix4x4 {
 
 #endif  // AVX INTRINSICS
 #else
+    __m128 theta = _mm_set1_ps(angle);
+    // [cos, cos, cos, cos]
+    __m128 cos = _mm_cosd_ps(theta);
+    // [sin, sin, sin, sin]
+    __m128 sin = _mm_sind_ps(theta);
+    // [1 - cos, 1 - cos, 1 - cos, 1 - cos]
+    __m128 om_cos = _mm_sub_ps(_mm_set1_ps(1.0f), cos);
 
+    // [a_x², a_y², a_z², 0]
+    __m128 diag = _mm_mul_ps(axis.m_value, axis.m_value);
+    // [(1 - cos)a_x², (1 - cos)a_y², (1 - cos)a_z², 0]
+    diag = _mm_mul_ps(om_cos, diag);
+    // [cos + (1 - cos)a_x², cos + (1 - cos)a_y², cos + (1 - cos)a_z², 0]
+    diag = _mm_add_ps(cos, diag);
+
+    // [(1-cos)a_x, (1-cos)a_y, (1-cos)a_z, 0]
+    om_cos = _mm_mul_ps(om_cos, axis.m_value);
+    // [(1-cos)a_x, (1-cos)a_y, (1-cos)a_z, 0]
+    om_cos = _mm_shuffle_ps(om_cos, om_cos, _MM_SHUFFLE(3, 2, 1, 0));
+    // [(1-cos)a_x*a_y, (1-cos)a_y*a_z, (1-cos)a_x*a_z, 0]
+    om_cos = _mm_mul_ps(om_cos, _mm_shuffle_ps(axis.m_value, axis.m_value,
+                                               _MM_SHUFFLE(3, 0, 2, 1)));
+
+    // [a_x*sin, a_y*sin, a_z*sin, 0]
+    cos = _mm_mul_ps(axis.m_value, sin);
+    // [a_z*sin, a_x*sin, a_y*sin, 0]
+    cos = _mm_shuffle_ps(cos, cos, _MM_SHUFFLE(3, 1, 0, 2));
+    // [-a_z*sin, -a_x*sin, -a_y*sin, 0]
+    sin = _mm_xor_ps(cos, _mm_set_ps(0.0f, -0.0f, -0.0f, -0.0f));
+
+    // [(1-cos)a_x*a_y + a_z*sin, (1-cos)a_y*a_z + a_x*sin, (1-cos)a_x*a_z +
+    // a_y*sin, 0]
+    cos = _mm_add_ps(om_cos, cos);
+    // [(1-cos)a_x*a_y - a_z*sin, (1-cos)a_y*a_z - a_x*sin, (1-cos)a_x*a_z -
+    // a_y*sin, 0]
+    sin = _mm_add_ps(om_cos, sin);
+
+    // [cos + (1 - cos)a_x², cos + (1 - cos)a_y², (1-cos)a_x*a_y + a_z*sin, 0]
+    theta = _mm_shuffle_ps(diag, cos, _MM_SHUFFLE(3, 0, 1, 0));
+    // [0, cos + (1 - cos)a_x², cos + (1 - cos)a_y², (1-cos)a_x*a_y + a_z*sin]
+    theta = _mm_shuffle_ps(theta, theta, _MM_SHUFFLE(2, 1, 0, 3));
+    // [(1-cos)a_x*a_y - a_z*sin, cos + (1 - cos)a_x², cos + (1 - cos)a_y²,
+    // (1-cos)a_x*a_y + a_z*sin]
+    theta = _mm_move_ss(theta, sin);
+    // [cos + (1 - cos)a_x², (1-cos)a_x*a_y - a_z*sin, (1-cos)a_x*a_y + a_z*sin,
+    // cos + (1 - cos)a_y²]
+    theta = _mm_shuffle_ps(theta, theta, _MM_SHUFFLE(2, 3, 0, 1));
+
+    // [(1-cos)a_x*a_z + a_y*sin, 0, (1-cos)a_y*a_z - a_x*sin, 0]
+    om_cos = _mm_shuffle_ps(cos, sin, _MM_SHUFFLE(3, 1, 3, 2));
+
+    // [(1-cos)a_y*a_z + a_x*sin, 0, (1-cos)a_x*a_z - a_y*sin, 0]
+    cos = _mm_shuffle_ps(cos, sin, _MM_SHUFFLE(3, 2, 3, 1));
+    // [(1-cos)a_x*a_z - a_y*sin, (1-cos)a_y*a_z + a_x*sin, 0, 0]
+    cos = _mm_shuffle_ps(cos, cos, _MM_SHUFFLE(3, 1, 0, 2));
+
+    // [cos + (1 - cos)a_z², 0, 0, 0]
+    diag = _mm_shuffle_ps(diag, diag, _MM_SHUFFLE(3, 3, 3, 2));
+    // [cos + (1 - cos)a_z², 0, 0, 1]
+    diag = _mm_shuffle_ps(diag, _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f),
+                          _MM_SHUFFLE(3, 2, 1, 0));
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{theta}}, Matrix2x2{Vector{om_cos}},
+        Matrix2x2{Vector{cos}}, Matrix2x2{Vector{diag}}}};
 #endif  // USE_DOUBLE
 #else
     const FLOAT cos = std::cos(angle);
@@ -918,15 +992,12 @@ class Matrix4x4 {
     // TODO: Matrix4x4 scale for AVX512.
 #else
 #ifdef USE_INTRINSICS
-#ifdef USE_DOUBLE
-#if defined(__AVX2__) || defined(__AVX__)
-
-#else
-
-#endif  // AVX INTRINSICS
-#else
-
-#endif  // USE_DOUBLE
+    std::array<FLOAT, 4> val{};
+    translate.get(val.data());
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{1.0, 0.0, 0.0, 1.0}},
+        Matrix2x2{Vector{0.0, val[0], 0.0, val[1]}}, Matrix2x2{Vector{0.0}},
+        Matrix2x2{Vector{1.0, val[2], 0.0, 1.0}}}};
 #else
     return Matrix4x4{std::array<Matrix2x2, 4>{
         Matrix2x2{Vector{1.0, 0.0, 0.0, 1.0}},
@@ -969,7 +1040,56 @@ class Matrix4x4 {
 
 #endif  // AVX INTRINSICS
 #else
+    // [x_x, y_x, z_x, z_y]
+    __m128 tmp1 = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                                 matrix.m_value[1].m_value.m_value,
+                                 _MM_SHUFFLE(2, 0, 1, 0));
+    // [x_x², y_x², z_x², z_y²]
+    tmp1 = _mm_mul_ps(tmp1, tmp1);
+    // [x_y, y_y, z_y, z_y]
+    __m128 tmp2 = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                                 matrix.m_value[1].m_value.m_value,
+                                 _MM_SHUFFLE(2, 2, 3, 2));
+    // [x_y², y_y², z_y², z_y²]
+    tmp2 = _mm_mul_ps(tmp2, tmp2);
 
+    // [x_z², y_z², z_z², 0]
+    __m128 xyz_scale = _mm_shuffle_ps(matrix.m_value[2].m_value.m_value,
+                                      matrix.m_value[3].m_value.m_value,
+                                      _MM_SHUFFLE(2, 0, 1, 0));
+    xyz_scale = _mm_add_ps(xyz_scale, tmp2);
+    // [|x|², |y|², |z|², 2|z|²]
+    xyz_scale = _mm_add_ps(xyz_scale, tmp1);
+
+    // if value almost equals 0, set it to 1 to avoid divide by zero error.
+    xyz_scale = _mm_blendv_ps(xyz_scale, _mm_set1_ps(1.0f),
+                              _mm_cmplt_ps(xyz_scale, _mm_set1_ps(EPSILON)));
+    // [1/|x|², 1/|y|², 1/|z|², 0.5|z|²]
+    xyz_scale = _mm_div_ps(_mm_set1_ps(1.0f), xyz_scale);
+
+    // [x_x, x_y, y_x, y_y]
+    tmp1 = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                          matrix.m_value[0].m_value.m_value,
+                          _MM_SHUFFLE(3, 1, 2, 0));
+    // [1/|x|², 1/|y|², 1/|x|², 1/|y|²]
+    tmp2 = _mm_shuffle_ps(xyz_scale, xyz_scale, _MM_SHUFFLE(1, 1, 0, 0));
+    // [x_x', x_y', y_x', y_y']
+    __m128 mat0 = _mm_mul_ps(tmp2, tmp1);
+
+    // [z_x, z_y, 0, 0]
+    tmp1 = _mm_shuffle_ps(matrix.m_value[1].m_value.m_value,
+                          matrix.m_value[3].m_value.m_value,
+                          _MM_SHUFFLE(2, 2, 2, 0));
+    // [1/|z|², 1/|z|², 1/|z|², 1/|z|²]
+    tmp2 = _mm_shuffle_ps(xyz_scale, xyz_scale, _MM_SHUFFLE(2, 2, 2, 2));
+    // [z_x', z_y', 0, 0]
+    __m128 mat2 = _mm_mul_ps(tmp2, tmp1);
+
+    // [t_x, t_y, t_z, 0]
+    __m128 minus_t = _mm_shuffle_ps(matrix.m_value[1].m_value.m_value,
+                                    matrix.m_value[3].m_value.m_value,
+                                    _MM_SHUFFLE(2, 1, 3, 1));
+    // TODO: Matrix4x4 finish implementing transform inverse function.
 #endif  // USE_DOUBLE
 #else
     Vector x_axis{matrix.m_value[0].m_value[0], matrix.m_value[0].m_value[2],
