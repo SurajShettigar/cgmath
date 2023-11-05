@@ -1040,56 +1040,78 @@ class Matrix4x4 {
 
 #endif  // AVX INTRINSICS
 #else
-    // [x_x, y_x, z_x, z_y]
-    __m128 tmp1 = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
-                                 matrix.m_value[1].m_value.m_value,
-                                 _MM_SHUFFLE(2, 0, 1, 0));
-    // [x_x², y_x², z_x², z_y²]
-    tmp1 = _mm_mul_ps(tmp1, tmp1);
-    // [x_y, y_y, z_y, z_y]
-    __m128 tmp2 = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
-                                 matrix.m_value[1].m_value.m_value,
-                                 _MM_SHUFFLE(2, 2, 3, 2));
-    // [x_y², y_y², z_y², z_y²]
-    tmp2 = _mm_mul_ps(tmp2, tmp2);
+    // [x_x, y_x, z_x, t_x]
+    __m128 x = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                              matrix.m_value[1].m_value.m_value,
+                              _MM_SHUFFLE(1, 0, 1, 0));
+    // [x_y, y_y, z_y, t_y]
+    __m128 y = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                              matrix.m_value[1].m_value.m_value,
+                              _MM_SHUFFLE(3, 2, 3, 2));
+    // [x_z, y_z, z_z, t_z]
+    __m128 z = _mm_shuffle_ps(matrix.m_value[2].m_value.m_value,
+                              matrix.m_value[3].m_value.m_value,
+                              _MM_SHUFFLE(2, 0, 1, 0));
 
-    // [x_z², y_z², z_z², 0]
-    __m128 xyz_scale = _mm_shuffle_ps(matrix.m_value[2].m_value.m_value,
-                                      matrix.m_value[3].m_value.m_value,
-                                      _MM_SHUFFLE(2, 0, 1, 0));
-    xyz_scale = _mm_add_ps(xyz_scale, tmp2);
-    // [|x|², |y|², |z|², 2|z|²]
-    xyz_scale = _mm_add_ps(xyz_scale, tmp1);
+    // [x_x², y_x², z_x², t_x²]
+    __m128 scale = _mm_mul_ps(x, x);
+    // [x_x² + x_y², y_x² + y_u², z_x² + z_y², t_x² + t_y²]
+    scale = _mm_add_ps(scale, _mm_mul_ps(y, y));
+    // [|x|², |y|², |z|², |t|²]
+    scale = _mm_add_ps(scale, _mm_mul_ps(z, z));
+    scale = _mm_blendv_ps(scale, _mm_set1_ps(1.0f),
+                          _mm_cmplt_ps(scale, _mm_set1_ps(EPSILON)));
+    // [1/|x|², 1/|y|², 1/|z|², 0]
+    scale = _mm_div_ps(_mm_set_ps(1.0f, 1.0f, 1.0f, 0.0f), scale);
 
-    // if value almost equals 0, set it to 1 to avoid divide by zero error.
-    xyz_scale = _mm_blendv_ps(xyz_scale, _mm_set1_ps(1.0f),
-                              _mm_cmplt_ps(xyz_scale, _mm_set1_ps(EPSILON)));
-    // [1/|x|², 1/|y|², 1/|z|², 0.5|z|²]
-    xyz_scale = _mm_div_ps(_mm_set1_ps(1.0f), xyz_scale);
-
-    // [x_x, x_y, y_x, y_y]
-    tmp1 = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
-                          matrix.m_value[0].m_value.m_value,
-                          _MM_SHUFFLE(3, 1, 2, 0));
-    // [1/|x|², 1/|y|², 1/|x|², 1/|y|²]
-    tmp2 = _mm_shuffle_ps(xyz_scale, xyz_scale, _MM_SHUFFLE(1, 1, 0, 0));
-    // [x_x', x_y', y_x', y_y']
-    __m128 mat0 = _mm_mul_ps(tmp2, tmp1);
-
-    // [z_x, z_y, 0, 0]
-    tmp1 = _mm_shuffle_ps(matrix.m_value[1].m_value.m_value,
-                          matrix.m_value[3].m_value.m_value,
-                          _MM_SHUFFLE(2, 2, 2, 0));
-    // [1/|z|², 1/|z|², 1/|z|², 1/|z|²]
-    tmp2 = _mm_shuffle_ps(xyz_scale, xyz_scale, _MM_SHUFFLE(2, 2, 2, 2));
-    // [z_x', z_y', 0, 0]
-    __m128 mat2 = _mm_mul_ps(tmp2, tmp1);
+    // [x_x', y_x', z_x', 0]
+    x = _mm_mul_ps(scale, x);
+    // [x_y', y_y', z_y', 0]
+    y = _mm_mul_ps(scale, y);
+    // [x_z', y_z', z_z', 0]
+    z = _mm_mul_ps(scale, z);
 
     // [t_x, t_y, t_z, 0]
-    __m128 minus_t = _mm_shuffle_ps(matrix.m_value[1].m_value.m_value,
-                                    matrix.m_value[3].m_value.m_value,
-                                    _MM_SHUFFLE(2, 1, 3, 1));
-    // TODO: Matrix4x4 finish implementing transform inverse function.
+    __m128 t = _mm_shuffle_ps(matrix.m_value[1].m_value.m_value,
+                              matrix.m_value[3].m_value.m_value,
+                              _MM_SHUFFLE(2, 1, 3, 1));
+    // [-t_x, -t_y, -t_z, 0]
+    t = _mm_xor_ps(t, _mm_set1_ps(-0.0f));
+
+    // [-t_x*x_x', -t_x*y_x', -t_x*z_x', 0]
+    __m128 tmp = _mm_mul_ps(x, _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 0, 0, 0)));
+    // [-t_x*x_x' + -t_y*x_y', -t_x*y_x' + -t_y*y_y', -t_x*z_x' + -t_y*z_y', 0]
+    tmp = _mm_add_ps(tmp, _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 1, 1, 1)));
+    // [dot(-t, x'), dot(-t, y'), dot(-t, z'), 0]
+    t = _mm_add_ps(tmp, _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 2, 2, 2)));
+
+    // [x_x', y_x', x_y', y_y']
+    scale = _mm_shuffle_ps(x, y, _MM_SHUFFLE(1, 0, 1, 0));
+    tmp = x;
+    // [x_x', x_y', y_x', y_y']
+    x = _mm_shuffle_ps(scale, scale, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [z_x', 0, z_y', 0]
+    scale = _mm_shuffle_ps(tmp, y, _MM_SHUFFLE(3, 2, 3, 2));
+    tmp = z;
+    z = scale;
+
+    // [x_z', y_z', dot(-t, x'), dot(-t, y')]
+    scale = _mm_shuffle_ps(tmp, t, _MM_SHUFFLE(1, 0, 1, 0));
+    // [x_z', dot(-t, x'), y_z', dot(-t, y')]
+    y = _mm_shuffle_ps(scale, scale, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [dot(-t, z'), 0, z_z', 0]
+    t = _mm_shuffle_ps(t, tmp, _MM_SHUFFLE(3, 2, 3, 2));
+    // [z_z', dot(-t, z'), 0, 0]
+    t = _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 1, 0, 2));
+    // [z_z', dot(-t, z'), 0, 1]
+    t = _mm_shuffle_ps(t, _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f),
+                       _MM_SHUFFLE(3, 2, 1, 0));
+
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2{Vector{x}}, Matrix2x2{Vector{y}},
+                                 Matrix2x2{Vector{z}}, Matrix2x2{Vector{t}}}};
 #endif  // USE_DOUBLE
 #else
     Vector x_axis{matrix.m_value[0].m_value[0], matrix.m_value[0].m_value[2],
@@ -1146,7 +1168,62 @@ class Matrix4x4 {
 
 #endif  // AVX INTRINSICS
 #else
+    // [x_x, y_x, z_x, t_x]
+    __m128 x = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                              matrix.m_value[1].m_value.m_value,
+                              _MM_SHUFFLE(1, 0, 1, 0));
+    // [x_y, y_y, z_y, t_y]
+    __m128 y = _mm_shuffle_ps(matrix.m_value[0].m_value.m_value,
+                              matrix.m_value[1].m_value.m_value,
+                              _MM_SHUFFLE(3, 2, 3, 2));
+    // [x_z, y_z, z_z, t_z]
+    __m128 z = _mm_shuffle_ps(matrix.m_value[2].m_value.m_value,
+                              matrix.m_value[3].m_value.m_value,
+                              _MM_SHUFFLE(2, 0, 1, 0));
+    // [t_x, t_y, t_z, 0]
+    __m128 t = _mm_shuffle_ps(matrix.m_value[1].m_value.m_value,
+                              matrix.m_value[3].m_value.m_value,
+                              _MM_SHUFFLE(2, 1, 3, 1));
+    // [-t_x, -t_y, -t_z, 0]
+    t = _mm_xor_ps(t, _mm_set1_ps(-0.0f));
 
+    // [-t_x*x_x, -t_x*y_x, -t_x*z_x, 0]
+    __m128 tmp = _mm_mul_ps(x, _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 0, 0, 0)));
+    // [-t_x*x_x + -t_y*x_y, -t_x*y_x + -t_y*y_y, -t_x*z_x + -t_y*z_y, 0]
+    tmp = _mm_add_ps(tmp, _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 1, 1, 1)));
+    // [dot(-t, x), dot(-t, y), dot(-t, z), 0]
+    t = _mm_add_ps(tmp, _mm_shuffle_ps(t, t, _MM_SHUFFLE(3, 2, 2, 2)));
+
+    tmp = x;
+    // [x_x, y_x, x_y, y_y]
+    x = _mm_shuffle_ps(x, y, _MM_SHUFFLE(1, 0, 1, 0));
+    // [x_x, x_y, y_x, y_y]
+    x = _mm_shuffle_ps(x, x, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [z_x, t_x, z_y, 0]
+    tmp = _mm_shuffle_ps(tmp, y, _MM_SHUFFLE(3, 2, 3, 2));
+    // [z_x, 0, z_y, 0]
+    tmp = _mm_shuffle_ps(tmp, tmp, _MM_SHUFFLE(3, 2, 3, 0));
+
+    // [x_z, y_z, dot(-t, x), dot(-t, y)]
+    y = _mm_shuffle_ps(z, t, _MM_SHUFFLE(1, 0, 1, 0));
+    // [x_z, dot(-t, x), y_z, dot(-t, y)]
+    y = _mm_shuffle_ps(x, x, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [dot(-t, z), 0, z_z, t_z]
+    t = _mm_shuffle_ps(t, z, _MM_SHUFFLE(3, 2, 3, 2));
+    // [z_z, dot(-t, z), 0, 0]
+    t = _mm_shuffle_ps(t, t, _MM_SHUFFLE(1, 1, 0, 2));
+    // [z_z, dot(-t, z), 0, 1]
+    t = _mm_shuffle_ps(t, _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f),
+                       _MM_SHUFFLE(3, 2, 1, 0));
+
+    // [z_x, 0, z_y, 0]
+    z = tmp;
+
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2{Vector{x}}, Matrix2x2{Vector{y}},
+                                 Matrix2x2{Vector{z}}, Matrix2x2{Vector{t}}}};
 #endif  // USE_DOUBLE
 #else
     Vector x_axis{matrix.m_value[0].m_value[0], matrix.m_value[0].m_value[2],
