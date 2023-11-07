@@ -895,16 +895,16 @@ TEST_F(MatrixTest, Matrix4x4FunctionsTransformInverse) {
   Matrix4x4 mat = Matrix4x4::translation(Vector3{1.0, 0.5, -0.25}) *
                   Matrix4x4::rotation(Vector3{45.0, 0.00001, -10.5}) *
                   Matrix4x4::scale(Vector3{0.5, 0.5, 0.5});
-  Matrix4x4 res{0.49162746502712407,
-                -0.091117702072649395,
-                -0.000000061706707474421454,
+  Matrix4x4 res{0.4916274650271241,
+                -0.0911177020726494,
+                -0.0000000617067075,
                 0.0,
-                0.064429987924295717,
-                0.34763310638671213,
-                0.35355339059327379,
+                0.0644299879242957,
+                0.3476331063867121,
+                0.3535533905932738,
                 0.0,
-                -0.064429902119117116,
-                -0.34763312228975651,
+                -0.0644299021191171,
+                -0.3476331222897565,
                 0.3535533905932684,
                 0.0,
                 1.0,
@@ -913,9 +913,33 @@ TEST_F(MatrixTest, Matrix4x4FunctionsTransformInverse) {
                 1.0};
   ASSERT_EQ(mat, res);
 
-  // TODO: Matrix4x4 Test Transform Inverse
+  res = Matrix4x4::inverse(mat);
+  mat = Matrix4x4::transformInverse(mat);
+  ASSERT_EQ(mat, res);
 }
 
 TEST_F(MatrixTest, Matrix4x4FunctionsTransformInverseUnitScale) {
-  // TODO: Matrix4x4 Test Transform Inverse with unit scale
+  Matrix4x4 mat = Matrix4x4::translation(Vector3{1.0, 0.5, -0.25}) *
+                  Matrix4x4::rotation(Vector3{45.0, 0.00001, -10.5});
+  Matrix4x4 res{0.9832549300542481,
+                -0.1822354041452988,
+                -0.0000001234134150,
+                0.0,
+                0.1288599758485914,
+                0.6952662127734243,
+                0.7071067811865476,
+                0.0,
+                -0.1288598042382342,
+                -0.6952662445795130,
+                0.7071067811865368,
+                0.0,
+                1.0,
+                0.5,
+                -0.25,
+                1.0};
+  ASSERT_EQ(mat, res);
+
+  res = Matrix4x4::inverse(mat);
+  mat = Matrix4x4::transformInverseUnitScale(mat);
+  ASSERT_EQ(mat, res);
 }
