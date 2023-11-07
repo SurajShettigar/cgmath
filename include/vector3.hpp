@@ -17,6 +17,7 @@ class Vector2;
 class Vector4;
 
 class Matrix3x3;
+class Matrix4x4;
 
 using Vector = internal::Vector;
 
@@ -25,6 +26,8 @@ using Vector = internal::Vector;
  */
 class Vector3 {
   friend class Matrix3x3;
+  friend class Matrix4x4;
+
  public:
   /// [0.0, 0.0, 0.0]
   static const Vector3 ZERO;

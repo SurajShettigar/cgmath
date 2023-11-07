@@ -614,7 +614,7 @@ class Matrix4x4 {
 
 #endif  // AVX INTRINSICS
 #else
-    __m128 theta = _mm_set_ps(angle, 90.0f, angle, 0.0f);
+    __m128 theta = _mm_set_ps(0.0f, angle, 90.0f, angle);
     // [cos, 0, cos, 1]
     __m128 cos = _mm_cosd_ps(theta);
     // [sin, 1, sin, 0]
@@ -667,7 +667,7 @@ class Matrix4x4 {
 
 #endif  // AVX INTRINSICS
 #else
-    __m128 theta = _mm_set_ps(angle, 90.0f, angle, 0.0f);
+    __m128 theta = _mm_set_ps(0.0f, angle, 90.0f, angle);
     // [cos, 0, cos, 1]
     __m128 cos = _mm_cosd_ps(theta);
     // [sin, 1, sin, 0]
@@ -847,12 +847,12 @@ class Matrix4x4 {
         Matrix2x2{Vector{ele0}}, Matrix2x2{Vector{ele1}}}};
 #endif  // USE_DOUBLE
 #else
-    const std::array<FLOAT, 3> cos{std::cos(euler_angles[0]),
-                                   std::cos(euler_angles[1]),
-                                   std::cos(euler_angles[2])};
-    const std::array<FLOAT, 3> sin{std::sin(euler_angles[0]),
-                                   std::sin(euler_angles[1]),
-                                   std::sin(euler_angles[2])};
+    const std::array<FLOAT, 3> cos{std::cos(radian(euler_angles[0])),
+                                   std::cos(radian(euler_angles[1])),
+                                   std::cos(radian(euler_angles[2]))};
+    const std::array<FLOAT, 3> sin{std::sin(radian(euler_angles[0])),
+                                   std::sin(radian(euler_angles[1])),
+                                   std::sin(radian(euler_angles[2]))};
     return Matrix4x4{std::array<Matrix2x2, 4>{
         Matrix2x2{Vector{
             cos[2] * cos[1] - sin[2] * sin[0] * sin[1], -sin[2] * cos[0],

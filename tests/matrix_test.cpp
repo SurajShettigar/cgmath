@@ -731,3 +731,191 @@ TEST_F(MatrixTest, Matrix4x4FunctionsInverse) {
   Matrix4x4 tmp = Matrix4x4::inverse(mat4_vec_init);
   ASSERT_EQ(tmp, mat);
 }
+
+TEST_F(MatrixTest, Matrix4x4FunctionsScale) {
+  Matrix4x4 mat = Matrix4x4::scale(Vector3{0.5, 0.5, 0.5});
+  Matrix4x4 res{0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0,
+                0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsRotationX) {
+  Matrix4x4 mat = Matrix4x4::rotationX(45.0);
+  Matrix4x4 res{1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                0.0,
+                -0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix4x4::rotationX(0.00001);
+  res = Matrix4x4{1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.9999999999999848,
+                  0.0000001745329252,
+                  0.0,
+                  0.0,
+                  -0.0000001745329252,
+                  0.9999999999999848,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix4x4::rotationX(-10.5);
+  res = Matrix4x4{1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.9832549075639546,
+                  -0.1822355254921475,
+                  0.0,
+                  0.0,
+                  0.1822355254921475,
+                  0.9832549075639546,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsRotationY) {
+  Matrix4x4 mat = Matrix4x4::rotationY(45.0);
+  Matrix4x4 res{
+      0.70710678118654752, 0.0, -0.70710678118654752, 0.0, 0.0, 1.0, 0.0, 0.0,
+      0.70710678118654752, 0.0, 0.70710678118654752,  0.0, 0.0, 0.0, 0.0, 1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix4x4::rotationY(0.00001);
+  res = Matrix4x4{
+      0.9999999999999848, 0.0, -0.0000001745329252, 0.0, 0.0, 1.0, 0.0, 0.0,
+      0.0000001745329252, 0.0, 0.9999999999999848,  0.0, 0.0, 0.0, 0.0, 1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix4x4::rotationY(-10.5);
+  res = Matrix4x4{
+      0.9832549075639546,  0.0, 0.1822355254921475, 0.0, 0.0, 1.0, 0.0, 0.0,
+      -0.1822355254921475, 0.0, 0.9832549075639546, 0.0, 0.0, 0.0, 0.0, 1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsRotationZ) {
+  Matrix4x4 mat = Matrix4x4::rotationZ(45.0);
+  Matrix4x4 res{0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                0.0,
+                -0.70710678118654752,
+                0.70710678118654752,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix4x4::rotationZ(0.00001);
+  res = Matrix4x4{0.999999999999984,
+                  0.0000001745329252,
+                  0.0,
+                  0.0,
+                  -0.0000001745329252,
+                  0.9999999999999848,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0};
+  ASSERT_EQ(mat, res);
+
+  mat = Matrix4x4::rotationZ(-10.5);
+  res = Matrix4x4{0.9832549075639546,
+                  -0.1822355254921475,
+                  0.0,
+                  0.0,
+                  0.1822355254921475,
+                  0.9832549075639546,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsRotation) {
+  Matrix4x4 mat = Matrix4x4::rotation(Vector3{45.0, 0.00001, -10.5});
+  Matrix4x4 res = Matrix4x4::rotationZ(-10.5) * Matrix4x4::rotationX(45.0) *
+                  Matrix4x4::rotationY(0.00001);
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsTranslation) {
+  Matrix4x4 mat = Matrix4x4::translation(Vector3{1.0, 0.5, -0.25});
+  Matrix4x4 res{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,   0.0,
+                0.0, 0.0, 1.0, 0.0, 1.0, 0.5, -0.25, 1.0};
+  ASSERT_EQ(mat, res);
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsTransformInverse) {
+  Matrix4x4 mat = Matrix4x4::translation(Vector3{1.0, 0.5, -0.25}) *
+                  Matrix4x4::rotation(Vector3{45.0, 0.00001, -10.5}) *
+                  Matrix4x4::scale(Vector3{0.5, 0.5, 0.5});
+  Matrix4x4 res{0.49162746502712407,
+                -0.091117702072649395,
+                -0.000000061706707474421454,
+                0.0,
+                0.064429987924295717,
+                0.34763310638671213,
+                0.35355339059327379,
+                0.0,
+                -0.064429902119117116,
+                -0.34763312228975651,
+                0.3535533905932684,
+                0.0,
+                1.0,
+                0.5,
+                -0.25,
+                1.0};
+  ASSERT_EQ(mat, res);
+
+  // TODO: Matrix4x4 Test Transform Inverse
+}
+
+TEST_F(MatrixTest, Matrix4x4FunctionsTransformInverseUnitScale) {
+  // TODO: Matrix4x4 Test Transform Inverse with unit scale
+}

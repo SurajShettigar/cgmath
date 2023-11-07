@@ -5,6 +5,7 @@
 #define CGMATH_MATRIX4X4_HPP
 
 #include "internal/matrix4x4.hpp"
+#include "vector3.hpp"
 #include "vector4.hpp"
 
 namespace cgmath {
@@ -196,6 +197,110 @@ class Matrix4x4 {
   /// Returns the inverse of the given 4x4 matrix.
   static inline Matrix4x4 inverse(const Matrix4x4 &matrix) {
     return Matrix4x4{internal::Matrix4x4::inverse(matrix.m_value)};
+  }
+
+  /**
+   * Creates a 3D scaling matrix from the given x, y and z axis scales.
+   * @param scale 3D vector containing the x, y and z axis scales.
+   * @return 4x4 Affine transform matrix containing only the 3D scale component.
+   */
+  static inline Matrix4x4 scale(const Vector3 &scale) {
+    return Matrix4x4{internal::Matrix4x4::scale(scale.m_value)};
+  }
+
+  /**
+   * Creates a 3D x-axis rotation matrix from the given angle in degree.
+   * @param angle A scalar angle for x-axis given in degree. The angle is
+   * assumed positive for counter-clockwise rotation and negative for clockwise
+   * rotation.
+   * @return 4x4 Affine transform matrix containing only the x-axis rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationX(FLOAT angle) {
+    return Matrix4x4{internal::Matrix4x4::rotationX(angle)};
+  }
+
+  /**
+   * Creates a 3D y-axis rotation matrix from the given angle in degree.
+   * @param angle A scalar angle for y-axis given in degree. The angle is
+   * assumed positive for counter-clockwise rotation and negative for clockwise
+   * rotation.
+   * @return 4x4 Affine transform matrix containing only the y-axis rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationY(FLOAT angle) {
+    return Matrix4x4{internal::Matrix4x4::rotationY(angle)};
+  }
+
+  /**
+   * Creates a 3D z-axis rotation matrix from the given angle in degree.
+   * @param angle A scalar angle for z-axis given in degree. The angle is
+   * assumed positive for counter-clockwise rotation and negative for clockwise
+   * rotation.
+   * @return 4x4 Affine transform matrix containing only the z-axis rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationZ(FLOAT angle) {
+    return Matrix4x4{internal::Matrix4x4::rotationZ(angle)};
+  }
+
+  /**
+   * Creates a 3D rotation matrix from the given euler angles in degree.
+   * @param angles A 3D vector containing euler angles for each axis. The angle
+   * is assumed positive for counter-clockwise rotation and negative for
+   * clockwise rotation.
+   * @return 4x4 Affine transform matrix containing only the 3D rotational
+   * component.
+   */
+  static inline Matrix4x4 rotation(const Vector3 &euler_angles) {
+    return Matrix4x4{internal::Matrix4x4::rotation(euler_angles.m_value)};
+  }
+
+  /**
+   * Creates a 3D rotation matrix describing a rotation over an arbitrary axis.
+   * @param angle The scalar angle by which to rotate about the given axis. The
+   * angle is assumed positive for counter-clockwise rotation and negative for
+   * clockwise rotation.
+   * @param axis A 3D normalized vector describing the axis around which to
+   * rotate.
+   * @return 4x4 Affine transform matrix containing only the 3D rotational
+   * component.
+   */
+  static inline Matrix4x4 rotationOverAxis(FLOAT angle, const Vector3 &axis) {
+    return Matrix4x4{
+        internal::Matrix4x4::rotationOverAxis(angle, axis.m_value)};
+  }
+
+  /**
+   * Creates a 3D translation matrix from the given x, y and z axis values.
+   * @param translate 3D vector containing the x, y and z axis translation
+   * values.
+   * @return 4x4 Affine transform matrix containing only the 3D translation
+   * component.
+   */
+  static inline Matrix4x4 translation(const Vector3 &translate) {
+    return Matrix4x4{internal::Matrix4x4::translation(translate.m_value)};
+  }
+
+  /**
+   * Returns the inverse of the given 4x4 affine transformation matrix.
+   * The matrix should have only translation, rotation and scaling components.
+   * @param mat The transform matrix to invert.
+   * @return 4x4 inverse affine transformation matrix
+   */
+  static inline Matrix4x4 transformInverse(const Matrix4x4 &matrix) {
+    return Matrix4x4{internal::Matrix4x4::transformInverse(matrix.m_value)};
+  }
+
+  /**
+   * Returns the inverse of the given 4x4 affine transformation matrix with unit
+   * scale. The matrix should have only translation and rotation components.
+   * @param mat The transform matrix to invert.
+   * @return 4x4 inverse affine transformation matrix
+   */
+  static inline Matrix4x4 transformInverseUnitScale(const Matrix4x4 &matrix) {
+    return Matrix4x4{
+        internal::Matrix4x4::transformInverseUnitScale(matrix.m_value)};
   }
 
  private:
