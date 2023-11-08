@@ -603,12 +603,25 @@ class Matrix4x4 {
     // | 0  sinθ   cosθ  0 |
     // | 0   0      0    1 |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 rotationX for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
+    __m256d theta = _mm256_set_pd(0.0, angle, 90.0, angle);
+    // [cos, 0, cos, 1]
+    __m256d cos = _mm256_cosd_pd(theta);
+    // [sin, 1, sin, 0]
+    __m256d sin = _mm256_sind_pd(theta);
+    // [sin, 1, -sin, 0]
+    sin = _mm256_xor_pd(sin, _mm256_set_pd(0.0, -0.0, 0.0, 0.0));
 
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{_mm256_permute4x64_pd(cos, _MM_SHUFFLE(0, 1, 1, 3))}},
+        Matrix2x2{Vector{_mm256_permute4x64_pd(sin, _MM_SHUFFLE(3, 2, 3, 3))}},
+        Matrix2x2{Vector{_mm256_permute4x64_pd(sin, _MM_SHUFFLE(3, 3, 0, 3))}},
+        Matrix2x2{
+            Vector{_mm256_permute4x64_pd(cos, _MM_SHUFFLE(3, 1, 1, 0))}}}};
 #else
     // [cos, 0]
     __m128d cos = _mm_cosd_pd(_mm_set_pd(90.0f, angle));
@@ -668,24 +681,38 @@ class Matrix4x4 {
     // | -sinθ  0  cosθ  0 |
     // |   0    0   0    1 |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 rotationY for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
+    __m256d theta = _mm256_set_pd(0.0, angle, 90.0, angle);
+    // [cos, 0, cos, 1]
+    __m256d cos = _mm256_cosd_pd(theta);
+    // [sin, 1, sin, 0]
+    __m256d sin = _mm256_sind_pd(theta);
+    // [sin, 1, -sin, 0]
+    sin = _mm256_xor_pd(sin, _mm256_set_pd(0.0, -0.0, 0.0, 0.0));
 
+    __m256d mat0 = _mm256_permute4x64_pd(cos, _MM_SHUFFLE(3, 1, 1, 0));
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{mat0}},
+        Matrix2x2{Vector{_mm256_permute4x64_pd(sin, _MM_SHUFFLE(3, 3, 3, 0))}},
+        Matrix2x2{Vector{_mm256_permute4x64_pd(sin, _MM_SHUFFLE(3, 3, 3, 2))}},
+        Matrix2x2{Vector{mat0}}}};
 #else
     // [cos, 0]
     __m128d cos = _mm_cosd_pd(_mm_set_pd(90.0f, angle));
     // [sin, 0]
     __m128d sin = _mm_sind_pd(_mm_set_pd(0.0f, angle));
 
+    std::array<__m128d, 2> mat0{cos, _mm_set_pd(1.0, 0.0)};
     return Matrix4x4{std::array<Matrix2x2, 4>{
-        Matrix2x2{Vector{{cos, _mm_set_pd(1.0, 0.0)}}},
-        Matrix2x2{Vector{{sin, _mm_setzero_pd()}}},
+        Matrix2x2{Vector{mat0}}, Matrix2x2{Vector{{sin, _mm_setzero_pd()}}},
         Matrix2x2{
             Vector{{_mm_xor_pd(sin, _mm_set1_pd(-0.0)), _mm_setzero_pd()}}},
-        Matrix2x2{Vector{{cos, _mm_set_pd(1.0, 0.0)}}}}};
+        Matrix2x2{Vector{mat0}}}};
 #endif  // AVX INTRINSICS
 #else
     __m128 theta = _mm_set_ps(0.0f, angle, 90.0f, angle);
@@ -728,12 +755,32 @@ class Matrix4x4 {
     // |  0      0    1  0 |
     // |  0      0    0  1 |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 rotationZ for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
+    __m256d theta = _mm256_set_pd(0.0, angle, 90.0, angle);
+    // [cos, 0, cos, 1]
+    __m256d cos = _mm256_cosd_pd(theta);
+    // [sin, 1, sin, 0]
+    __m256d sin = _mm256_sind_pd(theta);
+    // [sin, 1, -sin, 0]
+    sin = _mm256_xor_pd(sin, _mm256_set_pd(0.0, -0.0, 0.0, 0.0));
 
+    // [1, 0, 0, 1]
+    theta = _mm256_shuffle_pd(sin, cos, 0b1111);
+    // [cos, sin, cos, -sin]
+    sin = _mm256_shuffle_pd(cos, sin, 0b0000);
+    // [cos, -sin, sin, cos]
+    sin = _mm256_permute4x64_pd(sin, _MM_SHUFFLE(2, 1, 3, 0));
+
+    // [0, 0, 0, 0]
+    cos = _mm256_setzero_pd();
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{sin}}, Matrix2x2{Vector{cos}}, Matrix2x2{Vector{cos}},
+        Matrix2x2{Vector{theta}}}};
 #else
     // [cos, 0]
     __m128d cos = _mm_cosd_pd(_mm_set_pd(90.0f, angle));
@@ -797,12 +844,76 @@ class Matrix4x4 {
     // |             0                 0                  0              1 |
 
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 rotation for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
+    // [cosX, cosY, cosZ, 1]
+    __m256d cos = _mm256_cosd_pd(euler_angles.m_value);
+    // [sinX, sinY, sinZ, 0]
+    __m256d sin = _mm256_sind_pd(euler_angles.m_value);
 
+    // [sinZ, 0, cosZ, 1]
+    __m256d tmp = _mm256_permute2f128_pd(sin, cos, _MM_SHUFFLE(0, 3, 0, 1));
+    // [sinZ, sinZ, cosZ, cosZ]
+    tmp = _mm256_movedup_pd(tmp);
+    // [-sinZ, sinZ, cosZ, -cosZ]
+    tmp = _mm256_xor_pd(tmp, _mm256_set_pd(-0.0, 0.0, 0.0, -0.0));
+    // [-sinZ*sinX, sinZ*sinX, cosZ*sinX, -cosZ*sinX]
+    tmp =
+        _mm256_mul_pd(tmp, _mm256_permute4x64_pd(sin, _MM_SHUFFLE(0, 0, 0, 0)));
+
+    // [sinY, cosY, 0, 1]
+    __m256d tmp0 = _mm256_shuffle_pd(sin, cos, 0b1111);
+    // [sinY, cosY, sinY, cosY]
+    tmp0 = _mm256_permute2f128_pd(tmp0, tmp0, _MM_SHUFFLE(0, 2, 0, 0));
+
+    // [-sinZ*sinX*sinY, sinZ*sinX*cosY, cosZ*sinX*sinY, -cosZ*sinX*cosY]
+    tmp = _mm256_mul_pd(tmp, tmp0);
+
+    // [cosZ, 1, sinZ, 0]
+    __m256d tmp1 = _mm256_permute2f128_pd(cos, sin, _MM_SHUFFLE(0, 3, 0, 1));
+    // [cosZ, cosZ, sinZ, sinZ]
+    tmp1 = _mm256_movedup_pd(tmp1);
+    // [cosY, sinY, cosY, sinY]
+    tmp0 = _mm256_permute_pd(tmp0, 0b0101);
+    // [cosZ*cosY, cosZ*sinY, sinZ*cosY, sinZ*sinY]
+    tmp0 = _mm256_mul_pd(tmp1, tmp0);
+
+    // [cosZ*cosY-sinZ*sinX*sinY, cosZ*sinY+sinZ*sinX*cosY,
+    // sinZ*cosY+cosZ*sinX*sinY, sinZ*sinY-cosZ*sinX*cosY]
+    tmp = _mm256_add_pd(tmp0, tmp);
+
+    // [sinZ, 0, cosZ, 1]
+    tmp0 = _mm256_permute2f128_pd(sin, cos, _MM_SHUFFLE(0, 3, 0, 1));
+    // [-sinZ, 0, cosZ, 0]
+    tmp0 = _mm256_xor_pd(tmp0, _mm256_set_pd(1.0, 0.0, 0.0, -0.0));
+    // [cosX, cosX, cosX, 1]
+    tmp1 = _mm256_permute4x64_pd(cos, _MM_SHUFFLE(3, 0, 0, 0));
+    // [-sinZ*cosX, 0, cosZ*cosX, 0]
+    tmp0 = _mm256_mul_pd(tmp0, tmp1);
+
+    // [sinY, 0, 0, 0]
+    __m256d tmp2 = _mm256_permute4x64_pd(sin, _MM_SHUFFLE(3, 3, 3, 1));
+    // [-sinY, 0, 0, 0]
+    tmp2 = _mm256_xor_pd(tmp2, _mm256_set1_pd(-0.0));
+    // [-cosX*sinY, 0, 0, 0]
+    tmp2 = _mm256_mul_pd(tmp1, tmp2);
+    // [-cosX*sinY, sinX, 0, 0]
+    tmp2 = _mm256_shuffle_pd(tmp2, sin, 0b1100);
+
+    // [cosY, 0, 1, 0]
+    sin = _mm256_shuffle_pd(cos, _mm256_setzero_pd(), 0b1111);
+    // [cosY, 0, 0, 1]
+    sin = _mm256_permute_pd(sin, 0b0110);
+    // [cosX*cosY, 0, 0, 1]
+    sin = _mm256_mul_pd(tmp1, sin);
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{_mm256_shuffle_pd(tmp, tmp0, 0b0000)}},
+        Matrix2x2{Vector{_mm256_shuffle_pd(tmp, tmp0, 0b1111)}},
+        Matrix2x2{Vector{tmp2}}, Matrix2x2{Vector{sin}}}};
 #else
     // [cosX, cosY]
     __m128d cos_xy = _mm_cosd_pd(euler_angles.m_value[0]);
@@ -988,12 +1099,13 @@ class Matrix4x4 {
     // | mcos*a_x*a_z - a_y*sin mcos*a_y*a_z+a_x*sin    cos+mcos*a_z²     0 |
     // |           0                     0                  0             1 |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 rotationOverAxis for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
-
+    // TODO: Matrix4x4 rotationOverAxis for AVX.
+    return Matrix4x4{};
 #else
     __m128d theta = _mm_set1_pd(angle);
     // [cos, cos]
@@ -1162,7 +1274,7 @@ class Matrix4x4 {
     // | 0  0  1  z |
     // | 0  0  0  1 |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 translation for AVX512.
 #else
 #ifdef USE_INTRINSICS
     std::array<FLOAT, 4> val{};
@@ -1203,12 +1315,13 @@ class Matrix4x4 {
     // | z_x'  z_y'  z_z' dot(-t, z') |
     // |  0     0     0        1      |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-    // TODO: Matrix4x4 scale for AVX512.
+    // TODO: Matrix4x4 transformInverse for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
-
+    // TODO: Matrix4x4 transformInverse for AVX.
+    return Matrix4x4{};
 #else
     // [x_x², y_x²]
     __m128d scale0 = _mm_mul_pd(matrix.m_value[0].m_value.m_value[0],
@@ -1423,12 +1536,13 @@ class Matrix4x4 {
 // | z_x  z_y  z_z dot(-t, z) |
 // |  0    0    0       1     |
 #if defined(USE_INTRINSICS) && defined(__AVX512F__)
-// TODO: Matrix4x4 scale for AVX512.
+// TODO: Matrix4x4 transformInverseUnitScale for AVX512.
 #else
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
-
+    // TODO: Matrix4x4 transformInverseUnitScale for AVX.
+    return Matrix4x4{};
 #else
     // [t_x, t_y]
     __m128d t0 = _mm_shuffle_pd(matrix.m_value[1].m_value.m_value[0],
