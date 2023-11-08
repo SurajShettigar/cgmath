@@ -884,6 +884,28 @@ TEST_F(MatrixTest, Matrix4x4FunctionsRotation) {
   ASSERT_EQ(mat, res);
 }
 
+TEST_F(MatrixTest, Matrix4x4FunctionsRotationOverAxis) {
+  Matrix4x4 mat =
+      Matrix4x4::rotationOverAxis(25.0, Vector3{0.75, 0.5, -0.25}.normalized());
+  Matrix4x4 res{0.9665384953702322,
+                -0.0727956759319679,
+                -0.2459758657532395,
+                0.0,
+                0.1531032870434108,
+                0.9330769907404642,
+                0.3254638426111610,
+                0.0,
+                0.2058220601975180,
+                -0.3522330463149753,
+                0.9130000879626036,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0};
+  ASSERT_EQ(mat, res);
+}
+
 TEST_F(MatrixTest, Matrix4x4FunctionsTranslation) {
   Matrix4x4 mat = Matrix4x4::translation(Vector3{1.0, 0.5, -0.25});
   Matrix4x4 res{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,   0.0,

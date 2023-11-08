@@ -813,16 +813,14 @@ class Matrix4x4 {
     // [sinZ, 0]
     __m128d sin_z = _mm_sind_pd(euler_angles.m_value[1]);
 
-    // [0.0, -0.0]
-    __m128d tmp = _mm_set_pd(-0.0, 0.0);
+    // [-0.0, 0.0]
+    __m128d tmp = _mm_set_pd(0.0, -0.0);
     // [sinZ, cosZ]
     __m128d tmp0 = _mm_shuffle_pd(sin_z, cos_z, _MM_SHUFFLE2(0, 0));
-    // [sinZ, cosZ]
-    __m128d tmp1 = tmp0;
     // [-sinZ, cosZ]
     tmp0 = _mm_xor_pd(tmp0, tmp);
     // [sinZ, -cosZ]
-    tmp1 = _mm_xor_pd(tmp0, _mm_shuffle_pd(tmp, tmp, _MM_SHUFFLE2(0, 1)));
+    __m128d tmp1 = _mm_xor_pd(tmp0, _mm_set1_pd(-0.0));
 
     // [sinX, sinX]
     tmp = _mm_shuffle_pd(sin_xy, sin_xy, _MM_SHUFFLE2(0, 0));
@@ -1054,7 +1052,7 @@ class Matrix4x4 {
     // [(1-cos)a_x*a_z+a_y*sin, (1-cos)a_y*a_z-a_x*sin]
     om_cos = _mm_add_pd(theta, cos);
     // [(1-cos)a_x*a_z-a_y*sin, (1-cos)a_y*a_z+a_x*sin]
-    diag0 = _mm_mul_pd(theta, _mm_xor_pd(cos, _mm_set1_pd(-0.0)));
+    diag0 = _mm_add_pd(theta, _mm_xor_pd(cos, _mm_set1_pd(-0.0)));
 
     sin = _mm_setzero_pd();
 
@@ -1134,9 +1132,9 @@ class Matrix4x4 {
         Matrix2x2{Vector{cos}}, Matrix2x2{Vector{diag}}}};
 #endif  // USE_DOUBLE
 #else
-    const FLOAT cos = std::cos(angle);
+    const FLOAT cos = std::cos(radian(angle));
     const FLOAT om_cos = static_cast<FLOAT>(1.0) - cos;
-    const FLOAT sin = std::sin(angle);
+    const FLOAT sin = std::sin(radian(angle));
     return Matrix4x4{std::array<Matrix2x2, 4>{
         Matrix2x2{Vector{cos + om_cos * axis[0] * axis[0],
                          om_cos * axis[0] * axis[1] - axis[2] * sin,
@@ -1212,7 +1210,96 @@ class Matrix4x4 {
 #if defined(__AVX2__) || defined(__AVX__)
 
 #else
+    // [x_x², y_x²]
+    __m128d scale0 = _mm_mul_pd(matrix.m_value[0].m_value.m_value[0],
+                                matrix.m_value[0].m_value.m_value[0]);
+    // [z_x², t_x²]
+    __m128d scale1 = _mm_mul_pd(matrix.m_value[1].m_value.m_value[0],
+                                matrix.m_value[1].m_value.m_value[0]);
+    // [x_x² + x_y², y_x² + y_y²]
+    scale0 =
+        _mm_add_pd(scale0, _mm_mul_pd(matrix.m_value[0].m_value.m_value[1],
+                                      matrix.m_value[0].m_value.m_value[1]));
+    // [z_x² + z_y², t_x² + t_y²]
+    scale1 =
+        _mm_add_pd(scale1, _mm_mul_pd(matrix.m_value[1].m_value.m_value[1],
+                                      matrix.m_value[1].m_value.m_value[1]));
+    // [|x|², |y|²]
+    scale0 =
+        _mm_add_pd(scale0, _mm_mul_pd(matrix.m_value[2].m_value.m_value[0],
+                                      matrix.m_value[2].m_value.m_value[0]));
+    // [|z|², |t|²]
+    scale1 =
+        _mm_add_pd(scale1, _mm_mul_pd(matrix.m_value[3].m_value.m_value[0],
+                                      matrix.m_value[3].m_value.m_value[0]));
+    scale0 = _mm_blendv_pd(scale0, _mm_set1_pd(1.0),
+                           _mm_cmplt_pd(scale0, _mm_set1_pd(EPSILON)));
+    scale1 = _mm_blendv_pd(scale1, _mm_set1_pd(1.0),
+                           _mm_cmplt_pd(scale1, _mm_set1_pd(EPSILON)));
+    // [1/|x|², 1/|y|²]
+    scale0 = _mm_div_pd(_mm_set1_pd(1.0), scale0);
+    // [1/|z|², 0]
+    scale1 = _mm_div_pd(_mm_set_pd(0.0, 1.0), scale1);
 
+    // [x_x', y_x']
+    __m128d x0 = _mm_mul_pd(scale0, matrix.m_value[0].m_value.m_value[0]);
+    // [z_x', 0]
+    __m128d x1 = _mm_mul_pd(scale1, matrix.m_value[1].m_value.m_value[0]);
+    // [x_y', y_y']
+    __m128d y0 = _mm_mul_pd(scale0, matrix.m_value[0].m_value.m_value[1]);
+    // [z_y', 0]
+    __m128d y1 = _mm_mul_pd(scale1, matrix.m_value[1].m_value.m_value[1]);
+    // [x_z', y_z']
+    __m128d z0 = _mm_mul_pd(scale0, matrix.m_value[2].m_value.m_value[0]);
+    // [z_z', 0]
+    __m128d z1 = _mm_mul_pd(scale1, matrix.m_value[3].m_value.m_value[0]);
+
+    // [t_x, t_y]
+    scale0 = _mm_shuffle_pd(matrix.m_value[1].m_value.m_value[0],
+                            matrix.m_value[1].m_value.m_value[1],
+                            _MM_SHUFFLE2(1, 1));
+    // [t_z, 0]
+    scale1 = _mm_shuffle_pd(matrix.m_value[3].m_value.m_value[0],
+                            matrix.m_value[3].m_value.m_value[1],
+                            _MM_SHUFFLE2(0, 1));
+    // [-t_x, -t_y]
+    scale0 = _mm_xor_pd(scale0, _mm_set1_pd(-0.0));
+    // [-t_z, 0]
+    scale1 = _mm_xor_pd(scale1, _mm_set1_pd(-0.0));
+
+    // [-t_x*x_x', -t_x*y_x']
+    __m128d tmp =
+        _mm_mul_pd(x0, _mm_shuffle_pd(scale0, scale0, _MM_SHUFFLE2(0, 0)));
+    // [-t_x*x_x' + -t_y*x_y', -t_x*y_x' + -t_y*y_y']
+    tmp = _mm_add_pd(tmp, _mm_mul_pd(y0, _mm_shuffle_pd(scale0, scale0,
+                                                        _MM_SHUFFLE2(1, 1))));
+    // [dot(-t, x'), dot(-t, y')]
+    tmp = _mm_add_pd(tmp, _mm_mul_pd(z0, _mm_shuffle_pd(scale1, scale1,
+                                                        _MM_SHUFFLE2(0, 0))));
+
+    // [-t_z*z_z', 0]
+    scale1 = _mm_mul_pd(z1, scale1);
+    // [-t_z*z_z' + -t_y*z_y', 0]
+    scale1 = _mm_add_pd(
+        scale1,
+        _mm_mul_pd(y1, _mm_shuffle_pd(scale0, scale0, _MM_SHUFFLE2(1, 1))));
+    // [dot(-t, z'), 0]
+    scale1 = _mm_add_pd(
+        scale1,
+        _mm_mul_pd(x1, _mm_shuffle_pd(scale0, scale0, _MM_SHUFFLE2(0, 0))));
+
+    // [dot(-t, x'), dot(-t, y')]
+    scale0 = tmp;
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{{_mm_shuffle_pd(x0, y0, _MM_SHUFFLE2(0, 0)),
+                          _mm_shuffle_pd(x0, y0, _MM_SHUFFLE2(1, 1))}}},
+        Matrix2x2{Vector{{_mm_shuffle_pd(z0, scale0, _MM_SHUFFLE2(0, 0)),
+                          _mm_shuffle_pd(z0, scale0, _MM_SHUFFLE2(1, 1))}}},
+        Matrix2x2{Vector{
+            {_mm_shuffle_pd(x1, y1, _MM_SHUFFLE2(0, 0)), _mm_setzero_pd()}}},
+        Matrix2x2{Vector{{_mm_shuffle_pd(z1, scale1, _MM_SHUFFLE2(0, 0)),
+                          _mm_set_pd(1.0, 0.0)}}}}};
 #endif  // AVX INTRINSICS
 #else
     // [x_x, y_x, z_x, t_x]
@@ -1230,7 +1317,7 @@ class Matrix4x4 {
 
     // [x_x², y_x², z_x², t_x²]
     __m128 scale = _mm_mul_ps(x, x);
-    // [x_x² + x_y², y_x² + y_u², z_x² + z_y², t_x² + t_y²]
+    // [x_x² + x_y², y_x² + y_y², z_x² + z_y², t_x² + t_y²]
     scale = _mm_add_ps(scale, _mm_mul_ps(y, y));
     // [|x|², |y|², |z|², |t|²]
     scale = _mm_add_ps(scale, _mm_mul_ps(z, z));
@@ -1343,7 +1430,60 @@ class Matrix4x4 {
 #if defined(__AVX2__) || defined(__AVX__)
 
 #else
+    // [t_x, t_y]
+    __m128d t0 = _mm_shuffle_pd(matrix.m_value[1].m_value.m_value[0],
+                                matrix.m_value[1].m_value.m_value[1],
+                                _MM_SHUFFLE2(1, 1));
+    // [t_z, 0]
+    __m128d t1 = _mm_shuffle_pd(matrix.m_value[3].m_value.m_value[0],
+                                matrix.m_value[3].m_value.m_value[1],
+                                _MM_SHUFFLE2(0, 1));
+    // [-t_x, -t_y]
+    t0 = _mm_xor_pd(t0, _mm_set1_pd(-0.0));
+    // [-t_z, 0]
+    t1 = _mm_xor_pd(t1, _mm_set1_pd(-0.0));
 
+    // [-t_x*x_x, -t_x*y_x]
+    __m128d tmp = _mm_mul_pd(matrix.m_value[0].m_value.m_value[0],
+                             _mm_shuffle_pd(t0, t0, _MM_SHUFFLE2(0, 0)));
+    // [-t_x*x_x + -t_y*x_y, -t_x*y_x + -t_y*y_y]
+    tmp =
+        _mm_add_pd(tmp, _mm_mul_pd(matrix.m_value[0].m_value.m_value[1],
+                                   _mm_shuffle_pd(t0, t0, _MM_SHUFFLE2(1, 1))));
+    // [dot(-t, x), dot(-t, y)]
+    tmp =
+        _mm_add_pd(tmp, _mm_mul_pd(matrix.m_value[2].m_value.m_value[0],
+                                   _mm_shuffle_pd(t1, t1, _MM_SHUFFLE2(0, 0))));
+
+    // [-t_z*z_z, 0]
+    t1 = _mm_mul_pd(matrix.m_value[3].m_value.m_value[0], t1);
+    // [-t_z*z_z + -t_y*z_y, -t_y²]
+    t1 = _mm_add_pd(t1, _mm_mul_pd(matrix.m_value[1].m_value.m_value[1],
+                                   _mm_shuffle_pd(t0, t0, _MM_SHUFFLE2(1, 1))));
+    // [dot(-t, z), -t_y² - t_x²]
+    t1 = _mm_add_pd(t1, _mm_mul_pd(matrix.m_value[1].m_value.m_value[0],
+                                   _mm_shuffle_pd(t0, t0, _MM_SHUFFLE2(0, 0))));
+
+    t0 = tmp;
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{{_mm_shuffle_pd(matrix.m_value[0].m_value.m_value[0],
+                                         matrix.m_value[0].m_value.m_value[1],
+                                         _MM_SHUFFLE2(0, 0)),
+                          _mm_shuffle_pd(matrix.m_value[0].m_value.m_value[0],
+                                         matrix.m_value[0].m_value.m_value[1],
+                                         _MM_SHUFFLE2(1, 1))}}},
+        Matrix2x2{Vector{{_mm_shuffle_pd(matrix.m_value[2].m_value.m_value[0],
+                                         t0, _MM_SHUFFLE2(0, 0)),
+                          _mm_shuffle_pd(matrix.m_value[2].m_value.m_value[0],
+                                         t0, _MM_SHUFFLE2(1, 1))}}},
+        Matrix2x2{Vector{{_mm_shuffle_pd(matrix.m_value[1].m_value.m_value[0],
+                                         matrix.m_value[1].m_value.m_value[1],
+                                         _MM_SHUFFLE2(0, 0)),
+                          _mm_setzero_pd()}}},
+        Matrix2x2{Vector{{_mm_shuffle_pd(matrix.m_value[3].m_value.m_value[0],
+                                         t1, _MM_SHUFFLE2(0, 0)),
+                          _mm_set_pd(1.0, 0.0)}}}}};
 #endif  // AVX INTRINSICS
 #else
     // [x_x, y_x, z_x, t_x]
