@@ -1104,8 +1104,69 @@ class Matrix4x4 {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
-    // TODO: Matrix4x4 rotationOverAxis for AVX.
-    return Matrix4x4{};
+    __m256d theta = _mm256_set1_pd(angle);
+    // [cos, cos, cos, cos]
+    __m256d cos = _mm256_cosd_pd(theta);
+    // [sin, sin, sin, sin]
+    __m256d sin = _mm256_sind_pd(theta);
+    // [1 - cos, 1 - cos, 1 - cos, 1 - cos]
+    __m256d om_cos = _mm256_sub_pd(_mm256_set1_pd(1.0), cos);
+
+    // [a_x², a_y², a_z², 0]
+    __m256d diag = _mm256_mul_pd(axis.m_value, axis.m_value);
+    // [(1 - cos)a_x², (1 - cos)a_y², (1 - cos)a_z², 0]
+    diag = _mm256_mul_pd(om_cos, diag);
+    // [cos + (1 - cos)a_x², cos + (1 - cos)a_y², cos + (1 - cos)a_z², cos]
+    diag = _mm256_add_pd(cos, diag);
+
+    // [(1-cos)a_x, (1-cos)a_y, (1-cos)a_z, 0]
+    om_cos = _mm256_mul_pd(om_cos, axis.m_value);
+    // [(1-cos)a_x*a_z, (1-cos)a_x*a_y, (1-cos)a_y*a_z, 0]
+    om_cos = _mm256_mul_pd(
+        om_cos, _mm256_permute4x64_pd(axis.m_value, _MM_SHUFFLE(3, 1, 0, 2)));
+
+    // [a_y*sin, a_z*sin, a_x*sin, 0]
+    cos = _mm256_mul_pd(
+        _mm256_permute4x64_pd(axis.m_value, _MM_SHUFFLE(3, 0, 2, 1)), sin);
+    // [-a_y*sin, -a_z*sin, -a_x*sin, 0]
+    sin = _mm256_xor_pd(cos, _mm256_set1_pd(-0.0));
+
+    // [(1-cos)a_x*a_z + a_y*sin, (1-cos)a_x*a_y + a_z*sin, (1-cos)a_y*a_z +
+    // a_x*sin, 0]
+    cos = _mm256_add_pd(om_cos, cos);
+    // [(1-cos)a_x*a_z - a_y*sin, (1-cos)a_x*a_y - a_z*sin, (1-cos)a_y*a_z -
+    // a_x*sin, 0]
+    sin = _mm256_add_pd(om_cos, sin);
+
+    // [(1-cos)a_x*a_y - a_z*sin, (1-cos)a_x*a_y + a_z*sin, 0, 0]
+    theta = _mm256_shuffle_pd(sin, cos, 0b1111);
+    //  [cos + (1 - cos)a_x², cos + (1 - cos)a_y², (1-cos)a_x*a_y - a_z*sin,
+    //  (1-cos)a_x*a_y + a_z*sin]
+    theta = _mm256_permute2f128_pd(diag, theta, _MM_SHUFFLE(0, 2, 0, 0));
+    //  [cos + (1 - cos)a_x², (1-cos)a_x*a_y - a_z*sin, (1-cos)a_x*a_y +
+    //  a_z*sin, cos + (1 - cos)a_y²]
+    theta = _mm256_permute4x64_pd(theta, _MM_SHUFFLE(1, 3, 2, 0));
+
+    // [(1-cos)a_x*a_z - a_y*sin, (1-cos)a_x*a_z + a_y*sin, (1-cos)a_y*a_z -
+    // a_x*sin, (1-cos)a_y*a_z + a_x*sin]
+    om_cos = _mm256_shuffle_pd(sin, cos, 0b0000);
+
+    // [(1-cos)a_x*a_z - a_y*sin, 0, (1-cos)a_y*a_z + a_x*sin, 0]
+    cos = _mm256_shuffle_pd(om_cos, _mm256_setzero_pd(), 0b1100);
+    // [(1-cos)a_x*a_z - a_y*sin, (1-cos)a_y*a_z + a_x*sin, 0, 0]
+    cos = _mm256_permute4x64_pd(cos, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [(1-cos)a_x*a_z + a_y*sin, 0, (1-cos)a_y*a_z - a_x*sin, 0]
+    sin = _mm256_shuffle_pd(om_cos, _mm256_setzero_pd(), 0b0011);
+
+    // [cos + (1 - cos)a_x², 0, cos + (1 - cos)a_z², 1]
+    diag = _mm256_shuffle_pd(diag, _mm256_set_pd(0.0, 1.0, 0.0, 0.0), 0b0000);
+    // [cos + (1 - cos)a_z², 0, 0, 1]
+    diag = _mm256_permute4x64_pd(diag, _MM_SHUFFLE(3, 1, 1, 2));
+
+    return Matrix4x4{std::array<Matrix2x2, 4>{
+        Matrix2x2{Vector{theta}}, Matrix2x2{Vector{sin}},
+        Matrix2x2{Vector{cos}}, Matrix2x2{Vector{diag}}}};
 #else
     __m128d theta = _mm_set1_pd(angle);
     // [cos, cos]
@@ -1194,8 +1255,6 @@ class Matrix4x4 {
 
     // [(1-cos)a_x, (1-cos)a_y, (1-cos)a_z, 0]
     om_cos = _mm_mul_ps(om_cos, axis.m_value);
-    // [(1-cos)a_x, (1-cos)a_y, (1-cos)a_z, 0]
-    om_cos = _mm_shuffle_ps(om_cos, om_cos, _MM_SHUFFLE(3, 2, 1, 0));
     // [(1-cos)a_x*a_y, (1-cos)a_y*a_z, (1-cos)a_x*a_z, 0]
     om_cos = _mm_mul_ps(om_cos, _mm_shuffle_ps(axis.m_value, axis.m_value,
                                                _MM_SHUFFLE(3, 0, 2, 1)));
@@ -1205,7 +1264,7 @@ class Matrix4x4 {
     // [a_z*sin, a_x*sin, a_y*sin, 0]
     cos = _mm_shuffle_ps(cos, cos, _MM_SHUFFLE(3, 1, 0, 2));
     // [-a_z*sin, -a_x*sin, -a_y*sin, 0]
-    sin = _mm_xor_ps(cos, _mm_set_ps(0.0f, -0.0f, -0.0f, -0.0f));
+    sin = _mm_xor_ps(cos, _mm_set1_ps(-0.0f));
 
     // [(1-cos)a_x*a_y + a_z*sin, (1-cos)a_y*a_z + a_x*sin, (1-cos)a_x*a_z +
     // a_y*sin, 0]
@@ -1320,8 +1379,82 @@ class Matrix4x4 {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
-    // TODO: Matrix4x4 transformInverse for AVX.
-    return Matrix4x4{};
+    // [x_x, y_x, z_x, t_x]
+    __m256d x = _mm256_permute2f128_pd(matrix.m_value[0].m_value.m_value,
+                                       matrix.m_value[1].m_value.m_value,
+                                       _MM_SHUFFLE(0, 2, 0, 0));
+    // [x_y, y_y, z_y, t_y]
+    __m256d y = _mm256_permute2f128_pd(matrix.m_value[0].m_value.m_value,
+                                       matrix.m_value[1].m_value.m_value,
+                                       _MM_SHUFFLE(0, 3, 0, 1));
+    // [x_z, y_z, z_z, t_z]
+    __m256d z = _mm256_permute2f128_pd(matrix.m_value[2].m_value.m_value,
+                                       matrix.m_value[3].m_value.m_value,
+                                       _MM_SHUFFLE(0, 2, 0, 0));
+
+    // [x_x², y_x², z_x², t_x²]
+    __m256d scale = _mm256_mul_pd(x, x);
+    // [x_x² + x_y², y_x² + y_y², z_x² + z_y², t_x² + t_y²]
+    scale = _mm256_add_pd(scale, _mm256_mul_pd(y, y));
+    // [|x|², |y|², |z|², |t|²]
+    scale = _mm256_add_pd(scale, _mm256_mul_pd(z, z));
+    scale =
+        _mm256_blendv_pd(scale, _mm256_set1_pd(1.0),
+                         _mm256_cmp_pd(scale, _mm256_set1_pd(EPSILON), 0b01));
+    // [1/|x|², 1/|y|², 1/|z|², 0]
+    scale = _mm256_div_pd(_mm256_set_pd(0.0, 1.0, 1.0, 1.0), scale);
+
+    // [x_x', y_x', z_x', 0]
+    x = _mm256_mul_pd(scale, x);
+    // [x_y', y_y', z_y', 0]
+    y = _mm256_mul_pd(scale, y);
+    // [x_z', y_z', z_z', 0]
+    z = _mm256_mul_pd(scale, z);
+
+    // [t_x, t_z, t_y, 0]
+    __m256d t = _mm256_shuffle_pd(matrix.m_value[1].m_value.m_value,
+                                  matrix.m_value[3].m_value.m_value, 0b0111);
+    // [t_x, t_y, t_z, 0]
+    t = _mm256_permute4x64_pd(t, _MM_SHUFFLE(3, 1, 2, 0));
+    // [-t_x, -t_y, -t_z, 0]
+    t = _mm256_xor_pd(t, _mm256_set1_pd(-0.0));
+
+    // [-t_x*x_x', -t_x*y_x', -t_x*z_x', 0]
+    __m256d tmp =
+        _mm256_mul_pd(x, _mm256_permute4x64_pd(t, _MM_SHUFFLE(3, 0, 0, 0)));
+    // [-t_x*x_x' + -t_y*x_y', -t_x*y_x' + -t_y*y_y', -t_x*z_x' + -t_y*z_y', 0]
+    tmp = _mm256_add_pd(tmp, _mm256_mul_pd(y, _mm256_permute4x64_pd(
+                                                  t, _MM_SHUFFLE(3, 1, 1, 1))));
+    // [dot(-t, x'), dot(-t, y'), dot(-t, z'), 0]
+    t = _mm256_add_pd(tmp, _mm256_mul_pd(z, _mm256_permute4x64_pd(
+                                                t, _MM_SHUFFLE(3, 2, 2, 2))));
+
+    // [x_x', x_y', z_x', z_y']
+    scale = _mm256_shuffle_pd(x, y, 0b0000);
+    // [y_x', y_y', 0, 0]
+    tmp = _mm256_shuffle_pd(x, y, 0b1111);
+    // [x_x', x_y', y_x', y_y']
+    x = _mm256_permute2f128_pd(scale, tmp, _MM_SHUFFLE(0, 2, 0, 0));
+
+    // [z_x', z_y', 0, 0]
+    tmp = _mm256_permute2f128_pd(scale, tmp, _MM_SHUFFLE(0, 3, 0, 1));
+
+    // [x_z', y_z', dot(-t, x'), dot(-t, y')]
+    y = _mm256_permute2f128_pd(z, t, _MM_SHUFFLE(0, 2, 0, 0));
+    // [x_z', dot(-t, x'), y_z', dot(-t, y')]
+    y = _mm256_permute4x64_pd(y, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [z_z', 0, dot(-t, z'), 0]
+    t = _mm256_permute2f128_pd(z, t, _MM_SHUFFLE(0, 3, 0, 1));
+    // [z_z', dot(-t, z'), 0, 0]
+    t = _mm256_permute4x64_pd(t, _MM_SHUFFLE(3, 1, 2, 0));
+    t = _mm256_insertf128_pd(t, _mm_set_pd(1.0, 0.0), 0b1);
+
+    z = tmp;
+
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2{Vector{x}}, Matrix2x2{Vector{y}},
+                                 Matrix2x2{Vector{z}}, Matrix2x2{Vector{t}}}};
 #else
     // [x_x², y_x²]
     __m128d scale0 = _mm_mul_pd(matrix.m_value[0].m_value.m_value[0],
@@ -1541,8 +1674,66 @@ class Matrix4x4 {
 #ifdef USE_INTRINSICS
 #ifdef USE_DOUBLE
 #if defined(__AVX2__) || defined(__AVX__)
-    // TODO: Matrix4x4 transformInverseUnitScale for AVX.
-    return Matrix4x4{};
+    // [x_x, y_x, z_x, t_x]
+    __m256d x = _mm256_permute2f128_pd(matrix.m_value[0].m_value.m_value,
+                                       matrix.m_value[1].m_value.m_value,
+                                       _MM_SHUFFLE(0, 2, 0, 0));
+    // [x_y, y_y, z_y, t_y]
+    __m256d y = _mm256_permute2f128_pd(matrix.m_value[0].m_value.m_value,
+                                       matrix.m_value[1].m_value.m_value,
+                                       _MM_SHUFFLE(0, 3, 0, 1));
+    // [x_z, y_z, z_z, t_z]
+    __m256d z = _mm256_permute2f128_pd(matrix.m_value[2].m_value.m_value,
+                                       matrix.m_value[3].m_value.m_value,
+                                       _MM_SHUFFLE(0, 2, 0, 0));
+
+    // [t_x, t_z, t_y, 0]
+    __m256d t = _mm256_shuffle_pd(matrix.m_value[1].m_value.m_value,
+                                  matrix.m_value[3].m_value.m_value, 0b0111);
+    // [t_x, t_y, t_z, 0]
+    t = _mm256_permute4x64_pd(t, _MM_SHUFFLE(3, 1, 2, 0));
+    // [-t_x, -t_y, -t_z, 0]
+    t = _mm256_xor_pd(t, _mm256_set1_pd(-0.0));
+
+    // [-t_x*x_x, -t_x*y_x, -t_x*z_x, 0]
+    __m256d tmp =
+        _mm256_mul_pd(x, _mm256_permute4x64_pd(t, _MM_SHUFFLE(3, 0, 0, 0)));
+    // [-t_x*x_x + -t_y*x_y, -t_x*y_x + -t_y*y_y, -t_x*z_x + -t_y*z_y, 0]
+    tmp = _mm256_add_pd(tmp, _mm256_mul_pd(y, _mm256_permute4x64_pd(
+                                                  t, _MM_SHUFFLE(3, 1, 1, 1))));
+    // [dot(-t, x), dot(-t, y), dot(-t, z), 0]
+    t = _mm256_add_pd(tmp, _mm256_mul_pd(z, _mm256_permute4x64_pd(
+                                                t, _MM_SHUFFLE(3, 2, 2, 2))));
+
+    // [x_x, x_y, z_x, z_y]
+    tmp = _mm256_shuffle_pd(x, y, 0b0000);
+    // [y_x, y_y, t_x, t_y]
+    __m256d tmp0 = _mm256_shuffle_pd(x, y, 0b1111);
+    // [y_x, y_y, 0, 0]
+    tmp0 = _mm256_insertf128_pd(tmp0, _mm_setzero_pd(), 0b1);
+    // [x_x, x_y, y_x, y_y]
+    x = _mm256_permute2f128_pd(tmp, tmp0, _MM_SHUFFLE(0, 2, 0, 0));
+
+    // [z_x, z_y, 0, 0]
+    tmp0 = _mm256_permute2f128_pd(tmp, tmp0, _MM_SHUFFLE(0, 3, 0, 1));
+
+    // [x_z, y_z, dot(-t, x), dot(-t, y)]
+    y = _mm256_permute2f128_pd(z, t, _MM_SHUFFLE(0, 2, 0, 0));
+    // [x_z, dot(-t, x), y_z, dot(-t, y)]
+    y = _mm256_permute4x64_pd(y, _MM_SHUFFLE(3, 1, 2, 0));
+
+    // [z_z, 0, dot(-t, z), 0]
+    t = _mm256_permute2f128_pd(z, t, _MM_SHUFFLE(0, 3, 0, 1));
+    // [z_z, dot(-t, z), 0, 0]
+    t = _mm256_permute4x64_pd(t, _MM_SHUFFLE(3, 1, 2, 0));
+    // [z_z, dot(-t, z), 0, 1]
+    t = _mm256_insertf128_pd(t, _mm_set_pd(1.0, 0.0), 0b1);
+
+    z = tmp0;
+
+    return Matrix4x4{
+        std::array<Matrix2x2, 4>{Matrix2x2{Vector{x}}, Matrix2x2{Vector{y}},
+                                 Matrix2x2{Vector{z}}, Matrix2x2{Vector{t}}}};
 #else
     // [t_x, t_y]
     __m128d t0 = _mm_shuffle_pd(matrix.m_value[1].m_value.m_value[0],
